@@ -1,0 +1,18 @@
+[project]
+name = "fin-ai-extract"
+version = "0.1.0"
+description = "Extract structured AI investment data from earnings call transcripts using OpenAI"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "openai>=1.82.0",
+    "pydantic>=2.11.0",
+    "python-dotenv>=1.1.0",
+    "streamlit>=1.42.0",
+    "tiktoken>=0.7.0",
+    "tqdm>=4.67.0",
+    "watchdog>=6.0.0",
+]
+
+[project.scripts]
+fin-ai-extract = "main:main"
