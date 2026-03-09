@@ -83,7 +83,9 @@ def get_model_input_price(model: str, input_tokens: int | None = None) -> float 
     return MODEL_INPUT_PRICING.get(model)
 
 
-def get_model_price_label(model: str, request_tokens: list[int] | None = None) -> str | None:
+def get_model_price_label(
+    model: str, request_tokens: list[int] | None = None
+) -> str | None:
     """Return a human-friendly pricing label for display in the confirmation prompt."""
     if request_tokens is None:
         price = get_model_input_price(model)

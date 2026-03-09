@@ -81,10 +81,14 @@ async def run_pipeline(
         if not processed_files:
             processed_ids = load_processed_ids(output_path)
             before = len(parsed)
-            parsed = [(f, m, b) for f, m, b in parsed if m.event_id not in processed_ids]
+            parsed = [
+                (f, m, b) for f, m, b in parsed if m.event_id not in processed_ids
+            ]
         else:
             before = len(parsed)
-            parsed = [(f, m, b) for f, m, b in parsed if m.source_file not in processed_files]
+            parsed = [
+                (f, m, b) for f, m, b in parsed if m.source_file not in processed_files
+            ]
 
         logger.info(
             "Resume mode: skipping %d already-processed file(s), %d remaining",
@@ -133,7 +137,9 @@ async def run_pipeline(
         raise SystemExit(1)
 
     if overwrite_output:
-        logger.info("Starting fresh run: overwriting existing output CSV %s", output_path)
+        logger.info(
+            "Starting fresh run: overwriting existing output CSV %s", output_path
+        )
 
     client = AsyncOpenAI(
         base_url=base_url,

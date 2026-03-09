@@ -121,6 +121,7 @@ async def process_uploaded_files(
     progress_bar.progress(0.0, text=f"0/{total} complete")
 
     async with AsyncOpenAI(base_url=base_url, api_key=resolved_key) as client:
+
         async def process_one(
             meta: TranscriptMetadata,
             body: str,
@@ -135,13 +136,17 @@ async def process_uploaded_files(
                 )
                 return meta, extraction
 
-        tasks = [asyncio.create_task(process_one(meta, body)) for meta, body in parsed_inputs]
+        tasks = [
+            asyncio.create_task(process_one(meta, body)) for meta, body in parsed_inputs
+        ]
 
         completed = 0
         for task in asyncio.as_completed(tasks):
             meta, extraction = await task
             completed += 1
-            progress_bar.progress(completed / total, text=f"{completed}/{total} complete")
+            progress_bar.progress(
+                completed / total, text=f"{completed}/{total} complete"
+            )
             if extraction is None:
                 errors.append(meta.source_file)
             else:
@@ -173,12 +178,15 @@ def render_sidebar() -> tuple[str | None, str | None, int, str]:
     else:
         base_url = None
 
-    api_key = st.sidebar.text_input(
-        "API key",
-        type="password",
-        value=st.session_state.get("api_key", ""),
-        help="Leave blank for local endpoints that accept a placeholder key.",
-    ).strip() or None
+    api_key = (
+        st.sidebar.text_input(
+            "API key",
+            type="password",
+            value=st.session_state.get("api_key", ""),
+            help="Leave blank for local endpoints that accept a placeholder key.",
+        ).strip()
+        or None
+    )
 
     max_concurrency = st.sidebar.number_input(
         "Max concurrency",
@@ -251,9 +259,14 @@ def main() -> None:
         if parsed_inputs:
             bodies = [body for _, body in parsed_inputs]
             total_input_tokens, estimated_cost, cost_label = estimate_total_cost(
-                prompt_text, bodies, model,
+                prompt_text,
+                bodies,
+                model,
             )
-            parts = [f"**{len(parsed_inputs)}** file(s)", f"**{total_input_tokens:,}** input tokens"]
+            parts = [
+                f"**{len(parsed_inputs)}** file(s)",
+                f"**{total_input_tokens:,}** input tokens",
+            ]
             if cost_label:
                 parts.append(f"{cost_label}")
             if estimated_cost is not None:
