@@ -79,6 +79,19 @@ Enable verbose logging:
 uv run python main.py --input ./Current --output ./output.csv --verbose
 ```
 
+Tune common model sampling settings:
+
+```bash
+uv run python main.py \
+  --input ./Current/11473715_T.xml \
+  --output ./output.csv \
+  --temperature 0.2 \
+  --top-p 0.9 \
+  --max-output-tokens 2500 \
+  --reasoning-effort medium \
+  --verbosity low
+```
+
 Resume an interrupted run from an existing CSV:
 
 ```bash
@@ -135,19 +148,26 @@ If `--base-url` is provided and no API key is set, the tool automatically uses
 
 ## Command-line arguments
 
-| Argument | Description |
-| --- | --- |
-| `--input` | Required. Path to one XML file or a folder tree containing XML files. Folder scans are recursive. |
-| `--output` | Output CSV path. Defaults to `output.csv`. |
-| `--model` | Model name. Defaults to `OPENAI_MODEL` or `gpt-4o-mini`. |
-| `--base-url` | Optional OpenAI-compatible API base URL. Defaults to `OPENAI_BASE_URL`. |
-| `--api-key` | Optional API key. Defaults to `OPENAI_API_KEY`. |
-| `--max-concurrency` | Maximum number of concurrent extraction jobs. Also accepts `--max-async-jobs` and `--concurrency`. Defaults to `CONCURRENCY_LIMIT` or `100`. |
-| `--resume` | Resume from an existing output CSV. Requires an explicit `--output path.csv`. Already processed `source_file` values are skipped. |
-| `--dry-run` | Parse XML only. No API calls are made. |
-| `--sample` | Randomly process only `N` files from the input set. |
-| `--yes`, `-y` | Skip the cost confirmation prompt when using OpenAI-hosted models. |
-| `--verbose` | Enable debug logging. |
+| Argument              | Description                                                                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--input`             | Required. Path to one XML file or a folder tree containing XML files. Folder scans are recursive.                                            |
+| `--output`            | Output CSV path. Defaults to `output.csv`.                                                                                                   |
+| `--model`             | Model name. Defaults to `OPENAI_MODEL` or `gpt-4o-mini`.                                                                                     |
+| `--base-url`          | Optional OpenAI-compatible API base URL. Defaults to `OPENAI_BASE_URL`.                                                                      |
+| `--api-key`           | Optional API key. Defaults to `OPENAI_API_KEY`.                                                                                              |
+| `--temperature`       | Responses API sampling temperature from `0` to `2`.                                                                                          |
+| `--top-p`             | Responses API nucleus sampling mass from `0` to `1`.                                                                                         |
+| `--max-output-tokens` | Maximum output tokens, including reasoning tokens.                                                                                           |
+| `--reasoning-effort`  | Reasoning effort for supported `gpt-5` and `o`-series models: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`.                           |
+| `--verbosity`         | Output verbosity for supported models: `low`, `medium`, or `high`.                                                                           |
+| `--max-concurrency`   | Maximum number of concurrent extraction jobs. Also accepts `--max-async-jobs` and `--concurrency`. Defaults to `CONCURRENCY_LIMIT` or `100`. |
+| `--resume`            | Resume from an existing output CSV. Requires an explicit `--output path.csv`. Already processed `source_file` values are skipped.            |
+| `--dry-run`           | Parse XML only. No API calls are made.                                                                                                       |
+| `--sample`            | Randomly process only `N` files from the input set.                                                                                          |
+| `--yes`, `-y`         | Skip the cost confirmation prompt when using OpenAI-hosted models.                                                                           |
+| `--verbose`           | Enable debug logging.                                                                                                                        |
+
+For the current OpenAI Responses API path used by this project, the commonly exposed researcher-facing controls are `temperature`, `top_p`, `max_output_tokens`, `reasoning_effort`, and `verbosity`. We recommend changing `temperature` or `top_p`, but not both at the same time.
 
 ## Output
 

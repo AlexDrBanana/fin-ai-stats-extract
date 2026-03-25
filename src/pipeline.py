@@ -6,7 +6,7 @@ from openai import AsyncOpenAI
 from tqdm import tqdm
 
 from src.cost import confirm_cost
-from src.extractor import extract_one
+from src.extractor import ExtractionModelSettings, extract_one
 from src.parser import TranscriptMetadata, parse_xml_with_source
 from src.prompts import load_system_prompt
 from src.schema import EarningsCallExtraction
@@ -38,6 +38,7 @@ async def run_pipeline(
     input_path: Path,
     output_path: Path,
     model: str,
+    model_settings: ExtractionModelSettings | None,
     max_concurrency: int,
     base_url: str | None = None,
     api_key: str | None = None,
@@ -168,7 +169,13 @@ async def run_pipeline(
                     meta.company_name,
                 )
 
-            extraction = await extract_one(client, model, body, meta.event_id)
+            extraction = await extract_one(
+                client,
+                model,
+                body,
+                meta.event_id,
+                model_settings=model_settings,
+            )
             return meta, extraction
 
     tasks = [

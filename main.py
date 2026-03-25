@@ -7,13 +7,36 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from src.extractor import ExtractionModelSettings
 from src.pipeline import run_pipeline
 
+_REASONING_EFFORT_CHOICES = ("none", "minimal", "low", "medium", "high", "xhigh")
+_VERBOSITY_CHOICES = ("low", "medium", "high")
 
-def main() -> None:
-    load_dotenv()
-    raw_args = sys.argv[1:]
 
+def _float_in_range(name: str, minimum: float, maximum: float):
+    def parse(value: str) -> float:
+        number = float(value)
+        if number < minimum or number > maximum:
+            raise argparse.ArgumentTypeError(
+                f"{name} must be between {minimum:g} and {maximum:g}"
+            )
+        return number
+
+    return parse
+
+
+def _positive_int(name: str):
+    def parse(value: str) -> int:
+        number = int(value)
+        if number < 1:
+            raise argparse.ArgumentTypeError(f"{name} must be at least 1")
+        return number
+
+    return parse
+
+
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Extract AI/tech investment data from earnings-call transcripts.",
     )
@@ -43,6 +66,37 @@ def main() -> None:
         "--api-key",
         default=os.getenv("OPENAI_API_KEY"),
         help="OpenAI-compatible API key (default: OPENAI_API_KEY env).",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=_float_in_range("temperature", 0.0, 2.0),
+        default=None,
+        help="Sampling temperature for the Responses API (0 to 2).",
+    )
+    parser.add_argument(
+        "--top-p",
+        dest="top_p",
+        type=_float_in_range("top_p", 0.0, 1.0),
+        default=None,
+        help="Nucleus sampling mass for the Responses API (0 to 1).",
+    )
+    parser.add_argument(
+        "--max-output-tokens",
+        type=_positive_int("max_output_tokens"),
+        default=None,
+        help="Maximum number of output tokens, including reasoning tokens.",
+    )
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=_REASONING_EFFORT_CHOICES,
+        default=None,
+        help="Reasoning effort for supported gpt-5 and o-series models.",
+    )
+    parser.add_argument(
+        "--verbosity",
+        choices=_VERBOSITY_CHOICES,
+        default=None,
+        help="Text verbosity for supported models: low, medium, or high.",
     )
     parser.add_argument(
         "--max-concurrency",
@@ -80,7 +134,14 @@ def main() -> None:
         action="store_true",
         help="Skip cost-estimation confirmation (auto-accept).",
     )
+    return parser
 
+
+def main() -> None:
+    load_dotenv()
+    raw_args = sys.argv[1:]
+
+    parser = build_parser()
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -115,11 +176,20 @@ def main() -> None:
     if args.base_url and not api_key:
         api_key = "lm-studio"
 
+    model_settings = ExtractionModelSettings(
+        temperature=args.temperature,
+        top_p=args.top_p,
+        max_output_tokens=args.max_output_tokens,
+        reasoning_effort=args.reasoning_effort,
+        verbosity=args.verbosity,
+    )
+
     asyncio.run(
         run_pipeline(
             input_path=input_path,
             output_path=args.output,
             model=args.model,
+            model_settings=model_settings,
             max_concurrency=args.max_concurrency,
             base_url=args.base_url,
             api_key=api_key,

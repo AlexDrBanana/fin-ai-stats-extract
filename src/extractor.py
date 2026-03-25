@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import re
+from dataclasses import dataclass
+from typing import Literal
 
 from openai import AsyncOpenAI
 
@@ -12,7 +14,35 @@ logger = logging.getLogger(__name__)
 _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 2.0
 
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
+VerbosityLevel = Literal["low", "medium", "high"]
+
 _FENCE_RE = re.compile(r"^```(?:json)?\s*\n(.*?)```\s*$", re.DOTALL)
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionModelSettings:
+    temperature: float | None = None
+    top_p: float | None = None
+    max_output_tokens: int | None = None
+    reasoning_effort: ReasoningEffort | None = None
+    verbosity: VerbosityLevel | None = None
+
+    def to_responses_api_kwargs(self) -> dict[str, object]:
+        kwargs: dict[str, object] = {}
+
+        if self.temperature is not None:
+            kwargs["temperature"] = self.temperature
+        if self.top_p is not None:
+            kwargs["top_p"] = self.top_p
+        if self.max_output_tokens is not None:
+            kwargs["max_output_tokens"] = self.max_output_tokens
+        if self.reasoning_effort is not None:
+            kwargs["reasoning"] = {"effort": self.reasoning_effort}
+        if self.verbosity is not None:
+            kwargs["text"] = {"verbosity": self.verbosity}
+
+        return kwargs
 
 
 def _clean_json(text: str) -> str:
@@ -30,6 +60,7 @@ async def extract_one(
     transcript: str,
     event_id: str,
     system_prompt: str | None = None,
+    model_settings: ExtractionModelSettings | None = None,
 ) -> EarningsCallExtraction | None:
     """Extract structured AI investment data from a single transcript.
 
@@ -37,6 +68,9 @@ async def extract_one(
     Returns None if the model refuses or all retries fail.
     """
     prompt_text = system_prompt or load_system_prompt()
+    request_kwargs = (
+        model_settings.to_responses_api_kwargs() if model_settings is not None else {}
+    )
 
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
@@ -47,6 +81,7 @@ async def extract_one(
                     {"role": "user", "content": transcript},
                 ],
                 text_format=EarningsCallExtraction,
+                **request_kwargs,
             )
 
             parsed = response.output_parsed

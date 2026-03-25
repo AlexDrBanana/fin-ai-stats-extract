@@ -3,9 +3,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 # OpenAI text input pricing: USD per 1 million input tokens.
-# Source: https://developers.openai.com/api/docs/pricing (retrieved 2026-03-09)
+# Source: https://developers.openai.com/api/docs/pricing (retrieved 2026-03-25)
 MODEL_INPUT_PRICING: dict[str, float] = {
     "gpt-5.4": 2.50,
+    "gpt-5.4-mini": 0.75,
+    "gpt-5.4-nano": 0.20,
     "gpt-5.4-pro": 30.00,
     "gpt-5.2": 1.75,
     "gpt-5.2-pro": 21.00,
