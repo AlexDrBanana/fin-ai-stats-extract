@@ -1,5 +1,9 @@
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12"]
+build-backend = "uv_build"
+
 [project]
-name = "fin-ai-extract"
+name = "fin-ai-stats-extract"
 version = "0.1.0"
 description = "Extract structured AI investment data from earnings call transcripts using OpenAI"
 readme = "README.md"
@@ -15,4 +19,4 @@ dependencies = [
 ]
 
 [project.scripts]
-fin-ai-extract = "main:main"
+fin-ai-stats-extract = "fin_ai_stats_extract.cli:main"

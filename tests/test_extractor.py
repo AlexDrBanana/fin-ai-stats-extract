@@ -1,6 +1,6 @@
 import unittest
 
-from src.extractor import ExtractionModelSettings
+from fin_ai_stats_extract.extractor import ExtractionModelSettings
 
 
 class ExtractionModelSettingsTests(unittest.TestCase):

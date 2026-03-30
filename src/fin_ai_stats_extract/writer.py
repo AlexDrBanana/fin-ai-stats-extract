@@ -2,8 +2,8 @@ import csv
 import io
 from pathlib import Path
 
-from src.parser import TranscriptMetadata
-from src.schema import EarningsCallExtraction
+from fin_ai_stats_extract.parser import TranscriptMetadata
+from fin_ai_stats_extract.schema import EarningsCallExtraction
 
 # Flat CSV column order matching required_output.md
 _COLUMNS = [

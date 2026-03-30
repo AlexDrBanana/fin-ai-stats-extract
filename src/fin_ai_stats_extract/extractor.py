@@ -6,8 +6,8 @@ from typing import Literal
 
 from openai import AsyncOpenAI
 
-from src.prompts import load_system_prompt
-from src.schema import EarningsCallExtraction
+from fin_ai_stats_extract.prompts import load_system_prompt
+from fin_ai_stats_extract.schema import EarningsCallExtraction
 
 logger = logging.getLogger(__name__)
 

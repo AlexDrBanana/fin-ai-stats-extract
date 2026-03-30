@@ -5,12 +5,11 @@ from pathlib import Path
 from openai import AsyncOpenAI
 from tqdm import tqdm
 
-from src.cost import confirm_cost
-from src.extractor import ExtractionModelSettings, extract_one
-from src.parser import TranscriptMetadata, parse_xml_with_source
-from src.prompts import load_system_prompt
-from src.schema import EarningsCallExtraction
-from src.writer import (
+from fin_ai_stats_extract.cost import confirm_cost
+from fin_ai_stats_extract.extractor import ExtractionModelSettings, extract_one
+from fin_ai_stats_extract.parser import TranscriptMetadata, parse_xml_with_source
+from fin_ai_stats_extract.schema import EarningsCallExtraction
+from fin_ai_stats_extract.writer import (
     append_csv,
     initialize_output_csv,
     load_processed_ids,
@@ -37,6 +36,7 @@ def build_source_file_label(input_path: Path, file_path: Path) -> str:
 async def run_pipeline(
     input_path: Path,
     output_path: Path,
+    system_prompt: str,
     model: str,
     model_settings: ExtractionModelSettings | None,
     max_concurrency: int,
@@ -127,7 +127,6 @@ async def run_pipeline(
 
     # Cost estimation when using OpenAI's API (no custom base_url)
     if base_url is None and not skip_confirm:
-        system_prompt = load_system_prompt()
         bodies = [b for _, _, b in parsed]
         if not confirm_cost(system_prompt, bodies, model):
             logger.info("Aborted by user.")
@@ -174,6 +173,7 @@ async def run_pipeline(
                 model,
                 body,
                 meta.event_id,
+                system_prompt=system_prompt,
                 model_settings=model_settings,
             )
             return meta, extraction

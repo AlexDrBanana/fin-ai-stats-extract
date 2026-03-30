@@ -1,9 +1,23 @@
 import unittest
 
-from main import build_parser
+from fin_ai_stats_extract.cli import build_parser
 
 
 class MainCliTests(unittest.TestCase):
+    def test_accepts_prompt_path_flag(self) -> None:
+        parser = build_parser()
+
+        args = parser.parse_args(
+            [
+                "--input",
+                "sample.xml",
+                "--prompt",
+                "custom_prompt.md",
+            ]
+        )
+
+        self.assertEqual(str(args.prompt), "custom_prompt.md")
+
     def test_accepts_common_responses_tuning_flags(self) -> None:
         parser = build_parser()
 

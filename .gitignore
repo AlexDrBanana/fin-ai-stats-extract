@@ -9,13 +9,17 @@ wheels/
 # Virtual environments
 .venv
 
+# Prompt file created automatically by the CLI when missing
+system_prompt.md
+
 data/
 # General
 .DS_Store
 __MACOSX/
 .AppleDouble
 .LSOverride
-Icon[]
+Icon[
+]
 
 # Thumbnails
 ._*

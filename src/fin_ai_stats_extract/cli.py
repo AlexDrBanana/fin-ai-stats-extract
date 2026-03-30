@@ -7,8 +7,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from src.extractor import ExtractionModelSettings
-from src.pipeline import run_pipeline
+from fin_ai_stats_extract.extractor import ExtractionModelSettings
+from fin_ai_stats_extract.pipeline import run_pipeline
+from fin_ai_stats_extract.prompts import load_system_prompt
 
 _REASONING_EFFORT_CHOICES = ("none", "minimal", "low", "medium", "high", "xhigh")
 _VERBOSITY_CHOICES = ("low", "medium", "high")
@@ -51,6 +52,15 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("output.csv"),
         help="Path for the output CSV (default: output.csv).",
+    )
+    parser.add_argument(
+        "--prompt",
+        type=Path,
+        default=None,
+        help=(
+            "Path to a custom system prompt markdown file. If omitted, the CLI "
+            "uses ./system_prompt.md and creates it from the packaged default if missing."
+        ),
     )
     parser.add_argument(
         "--model",
@@ -184,10 +194,19 @@ def main() -> None:
         verbosity=args.verbosity,
     )
 
+    system_prompt = ""
+    if not args.dry_run:
+        try:
+            system_prompt = load_system_prompt(prompt_path=args.prompt)
+        except FileNotFoundError as exc:
+            logging.error("Prompt file does not exist: %s", exc.filename)
+            sys.exit(1)
+
     asyncio.run(
         run_pipeline(
             input_path=input_path,
             output_path=args.output,
+            system_prompt=system_prompt,
             model=args.model,
             model_settings=model_settings,
             max_concurrency=args.max_concurrency,

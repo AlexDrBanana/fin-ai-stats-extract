@@ -6,18 +6,18 @@ import pandas as pd
 import streamlit as st
 from openai import AsyncOpenAI
 
-from src.cost import estimate_total_cost
-from src.extractor import extract_one
-from src.openai_utils import list_available_models, resolve_api_key
-from src.parser import TranscriptMetadata, parse_xml_bytes
-from src.prompts import load_system_prompt
-from src.schema import EarningsCallExtraction
-from src.writer import results_to_rows
+from fin_ai_stats_extract.cost import estimate_total_cost
+from fin_ai_stats_extract.extractor import extract_one
+from fin_ai_stats_extract.openai_utils import list_available_models, resolve_api_key
+from fin_ai_stats_extract.parser import TranscriptMetadata, parse_xml_bytes
+from fin_ai_stats_extract.prompts import load_packaged_system_prompt
+from fin_ai_stats_extract.schema import EarningsCallExtraction
+from fin_ai_stats_extract.writer import results_to_rows
 
 for logger_name in ("openai", "openai._base_client", "httpx", "httpcore"):
     logging.getLogger(logger_name).setLevel(logging.WARNING)
 
-st.set_page_config(page_title="fin-ai-extract", page_icon="📄", layout="wide")
+st.set_page_config(page_title="fin-ai-stats-extract", page_icon="📄", layout="wide")
 
 st.markdown(
     """
@@ -228,7 +228,7 @@ def render_sidebar() -> tuple[str | None, str | None, int, str]:
 
 
 def main() -> None:
-    st.title("📄 fin-ai-extract")
+    st.title("📄 fin-ai-stats-extract")
     st.caption(
         "Upload XML earnings-call transcripts, select an endpoint and model, "
         "edit the system prompt, and download the extracted CSV in memory."
@@ -248,7 +248,7 @@ def main() -> None:
     with right:
         prompt_text = st.text_area(
             "System prompt",
-            value=load_system_prompt(),
+            value=load_packaged_system_prompt(),
             height=480,
             help="Adjust the extraction prompt before running the batch.",
         )
@@ -336,4 +336,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    main()
     main()

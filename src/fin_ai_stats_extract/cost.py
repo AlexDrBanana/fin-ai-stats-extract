@@ -163,7 +163,7 @@ def confirm_cost(system_prompt: str, transcripts: list[str], model: str) -> bool
     if estimated_cost is None or cost_label is None:
         logger.warning(
             "No pricing info for model '%s' — cannot estimate cost. "
-            "Add it to MODEL_INPUT_PRICING in src/cost.py if needed.",
+            "Add it to MODEL_INPUT_PRICING in src/fin_ai_stats_extract/cost.py if needed.",
             model,
         )
         print(f"\nTotal input tokens: {total_input_tokens:,}")
