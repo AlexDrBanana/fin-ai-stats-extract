@@ -9,8 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
-# Prompt file created automatically by the CLI when missing
-system_prompt.md
+# Prompt file created automatically by the CLI when missing (root only)
+/system_prompt.md
 
 data/
 # General

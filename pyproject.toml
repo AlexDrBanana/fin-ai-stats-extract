@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "fin-ai-stats-extract"
-version = "0.1.1"
+version = "0.1.2"
 description = "Extract structured AI investment data from earnings call transcripts using OpenAI"
 readme = "README.md"
 requires-python = ">=3.14"
