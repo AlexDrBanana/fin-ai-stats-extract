@@ -1,0 +1,175 @@
+[llm]
+instructions = """
+You are a financial analyst AI specializing in extracting structured data about technology and AI investments from earnings conference call transcripts.
+
+Be precise and conservative. Only extract information that is explicitly stated or strongly implied in the transcript.
+
+Apply these rules when producing the structured result:
+- For binary fields, use 1 if the category is mentioned and 0 if it is absent.
+- For list fields, return unique concise labels with no repetition.
+- For nullable numeric or string fields, use null when the transcript does not disclose the value.
+- Prefer null over guessing for numeric fields.
+- Distinguish AI-specific investments from broader non-AI technology investments.
+- Earlier transcripts may contain no AI discussion; zeros and nulls are acceptable when warranted by the evidence.
+"""
+model = "gpt-4o-mini"
+api_key_env = "OPENAI_API_KEY"
+# temperature = 0.2
+# top_p = 0.9
+# max_output_tokens = 2500
+# reasoning_effort = "medium"
+# verbosity = "low"
+# base_url = "http://127.0.0.1:1234/v1"
+
+[[output.groups]]
+key = "ai_infrastructure"
+title = "AI Infrastructure"
+description = "Data centers, chips, hardware, cloud compute, and other AI-specific infrastructure."
+
+[[output.groups.fields]]
+name = "ai_infra_binary"
+type = "integer"
+description = "1 if the firm mentions investment in AI infrastructure, 0 otherwise"
+
+[[output.groups.fields]]
+name = "ai_infra_types"
+type = "string_array"
+description = "List of unique AI infrastructure types mentioned"
+
+[[output.groups.fields]]
+name = "ai_infra_count"
+type = "integer"
+description = "Count of unique AI infrastructure types mentioned"
+count_of = "ai_infra_types"
+
+[[output.groups.fields]]
+name = "ai_infra_dollar"
+type = "number"
+nullable = true
+description = "Dollar value invested in AI infrastructure, or null if not disclosed"
+
+[[output.groups]]
+key = "ai_analytics"
+title = "AI Analytics"
+description = "Models, algorithms, AI-powered applications, and other AI software investments."
+
+[[output.groups.fields]]
+name = "ai_analytics_binary"
+type = "integer"
+description = "1 if the firm mentions investment in AI analytics, models, or applications, 0 otherwise"
+
+[[output.groups.fields]]
+name = "ai_analytics_types"
+type = "string_array"
+description = "List of unique AI analytics types mentioned"
+
+[[output.groups.fields]]
+name = "ai_analytics_count"
+type = "integer"
+description = "Count of unique AI analytics types mentioned"
+count_of = "ai_analytics_types"
+
+[[output.groups.fields]]
+name = "ai_analytics_dollar"
+type = "number"
+nullable = true
+description = "Dollar value invested in AI analytics, or null if not disclosed"
+
+[[output.groups]]
+key = "ai_talent"
+title = "AI Human Capital"
+description = "Hiring, retaining, and training AI-specific talent such as ML engineers and researchers."
+
+[[output.groups.fields]]
+name = "ai_talent_binary"
+type = "integer"
+description = "1 if the firm mentions investment in AI talent or hiring, 0 otherwise"
+
+[[output.groups.fields]]
+name = "ai_talent_types"
+type = "string_array"
+description = "List of unique AI talent roles or areas mentioned"
+
+[[output.groups.fields]]
+name = "ai_talent_count"
+type = "integer"
+description = "Count of unique AI talent types mentioned"
+count_of = "ai_talent_types"
+
+[[output.groups.fields]]
+name = "ai_talent_dollar"
+type = "number"
+nullable = true
+description = "Dollar value invested in AI talent, or null if not disclosed"
+
+[[output.groups.fields]]
+name = "ai_talent_headcount"
+type = "number"
+nullable = true
+description = "Number of AI workers mentioned, or null if not disclosed"
+
+[[output.groups]]
+key = "ai_risk"
+title = "AI Risks and Barriers"
+description = "AI-related risks, barriers, constraints, or challenges mentioned by the firm."
+
+[[output.groups.fields]]
+name = "ai_risk_binary"
+type = "integer"
+description = "1 if the firm mentions AI-related risks, barriers, or challenges, 0 otherwise"
+
+[[output.groups.fields]]
+name = "ai_risk_types"
+type = "string_array"
+description = "List of unique AI risk or barrier themes mentioned"
+
+[[output.groups.fields]]
+name = "ai_risk_count"
+type = "integer"
+description = "Count of unique AI risk or barrier themes mentioned"
+count_of = "ai_risk_types"
+
+[[output.groups.fields]]
+name = "ai_risk_sentiment"
+type = "string"
+nullable = true
+enum = ["positive", "negative", "mixed"]
+description = "Overall tone of the AI risk discussion, or null if no risk discussion is present"
+
+[[output.groups]]
+key = "tech_physical"
+title = "Non-AI Physical Technology Investment"
+description = "R&D facilities, labs, equipment, and non-AI technical infrastructure."
+
+[[output.groups.fields]]
+name = "tech_phys_binary"
+type = "integer"
+description = "1 if the firm mentions non-AI physical technology investment, 0 otherwise"
+
+[[output.groups.fields]]
+name = "tech_phys_dollar"
+type = "number"
+nullable = true
+description = "Dollar value of non-AI physical technology investment, or null if not disclosed"
+
+[[output.groups]]
+key = "tech_talent"
+title = "Non-AI Tech Human Capital"
+description = "Software engineers, IT staff, cybersecurity professionals, and other non-AI technical roles."
+
+[[output.groups.fields]]
+name = "tech_talent_binary"
+type = "integer"
+description = "1 if the firm mentions non-AI tech talent investment, 0 otherwise"
+
+[[output.groups.fields]]
+name = "tech_talent_headcount"
+type = "number"
+nullable = true
+description = "Number of non-AI tech workers mentioned, or null if not disclosed"
+
+[[output.groups.fields]]
+name = "tech_talent_dollar"
+type = "number"
+nullable = true
+description = "Dollar value invested in non-AI tech talent, or null if not disclosed"

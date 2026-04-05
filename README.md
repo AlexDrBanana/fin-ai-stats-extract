@@ -4,36 +4,51 @@
 
 `fin-ai-stats-extract` extracts structured AI and technology investment data from XML earnings-call transcripts and writes the results to CSV.
 
-It supports:
+The tool is now driven by a single TOML config file, `extract.toml`, which defines:
 
-- a single XML file or a folder tree of XML files via `--input`
-- OpenAI-hosted models
-- OpenAI-compatible local endpoints via `--base-url`
-- explicit resume mode via `--resume` using an existing output CSV
-- concurrent async extraction with a live progress bar
-- dry-run parsing to validate XML input without making API calls
-- a Streamlit UI for drag-and-drop uploads, model discovery, and in-memory CSV download
+- the base extraction instructions sent to the model
+- model and endpoint settings
+- the structured output groups and fields
 
-The output schema is based on `required_output.md`.
+That same config drives three things at once:
+
+- the final system instructions sent to the model
+- the structured JSON schema used for Responses API parsing
+- the CSV column order used for output
+
+CLI flags remain available for fast tuning and one-off overrides. When a CLI flag conflicts with a TOML value, the CLI value wins and the tool logs a warning.
 
 ## Requirements
 
 - Python 3.14+
 - `uv`
 
-## Install And Run
-
-For one-off usage without creating a local environment:
-
-```bash
-uvx fin-ai-stats-extract --input ./data/Current --output ./output.csv
-```
+## Install
 
 For local development in this repository:
 
 ```bash
 uv sync
 ```
+
+For one-off usage without creating a local environment:
+
+```bash
+uvx fin-ai-stats-extract
+```
+
+## Configuration
+
+The default config file is `./extract.toml`.
+
+If you run the tool without `--config` and `extract.toml` does not exist in the current working directory, the packaged default config is copied there automatically.
+
+The default config includes:
+
+- commented-out optional settings such as `temperature`, `top_p`, and `reasoning_effort`
+- the full grouped output schema for AI and non-AI investment extraction
+
+Edit `extract.toml` directly to change AI instructions, AI model settings, or output fields.
 
 ## Environment
 
@@ -47,49 +62,52 @@ Example values:
 
 ```env
 OPENAI_API_KEY=sk-your-key-here
-OPENAI_BASE_URL=
-OPENAI_MODEL=gpt-4o-mini
-CONCURRENCY_LIMIT=100
 ```
+
+By default, `extract.toml` reads the API key from `OPENAI_API_KEY` via `api_key_env = "OPENAI_API_KEY"`.
 
 ## Basic Usage
 
-Run on a folder of transcripts:
+Run using the defaults in `extract.toml`:
 
 ```bash
-uvx fin-ai-stats-extract --input ./data/Current --output ./output.csv
+uv run fin-ai-stats-extract --input ./data/Current
 ```
 
 Run on a single transcript:
 
 ```bash
-uvx fin-ai-stats-extract --input ./data/Current/11473715_T.xml --output ./output.csv
+uv run fin-ai-stats-extract --input ./data/Current/11473715_T.xml
+```
+
+Write to a different CSV for one run:
+
+```bash
+uv run fin-ai-stats-extract --output ./sample.csv
 ```
 
 Validate XML parsing only, without calling a model:
 
 ```bash
-uvx fin-ai-stats-extract --input ./data/Current --dry-run
+uv run fin-ai-stats-extract --dry-run
 ```
 
 Process only a sample of files:
 
 ```bash
-uvx fin-ai-stats-extract --input ./data/Current --sample 25 --output ./sample.csv
+uv run fin-ai-stats-extract --sample 25
 ```
 
 Enable verbose logging:
 
 ```bash
-uvx fin-ai-stats-extract --input ./data/Current --output ./output.csv --verbose
+uv run fin-ai-stats-extract --verbose
 ```
 
-Tune common model sampling settings:
+Tune common model settings for one run:
 
 ```bash
-uvx fin-ai-stats-extract \
-  --input ./data/Current/11473715_T.xml \
-  --output ./output.csv \
+uv run fin-ai-stats-extract \
   --temperature 0.2 \
   --top-p 0.9 \
   --max-output-tokens 2500 \
@@ -100,105 +118,106 @@ uvx fin-ai-stats-extract \
 Resume an interrupted run from an existing CSV:
 
 ```bash
-uvx fin-ai-stats-extract --input ./data/Current --output ./output.csv --resume
+uv run fin-ai-stats-extract --resume
 ```
 
-## Prompt Selection
-
-The CLI supports a custom prompt file:
+Use a different config file:
 
 ```bash
-uvx fin-ai-stats-extract \
-  --input ./data/Current \
-  --output ./output.csv \
-  --prompt ./my_prompt.md
+uv run fin-ai-stats-extract --config ./custom_extract.toml
 ```
 
-Prompt resolution works like this:
+Open the Tkinter review window instead of supplying all settings on the command line:
 
-1. If `--prompt PATH` is provided, that file is used.
-2. Otherwise the CLI looks for `./system_prompt.md` in the current working directory.
-3. If `./system_prompt.md` does not exist, the packaged default prompt is copied there and then used.
+```bash
+uv run fin-ai-stats-extract --gui
+```
 
-The packaged default prompt shipped with the distribution lives at `src/fin_ai_stats_extract/resources/system_prompt.md` in this repository.
+The GUI lets you edit the prompt instructions, model settings, input/output paths, runtime options, see the TOML-driven output format in a dedicated tab, and review the exact run cost automatically before confirming or cancelling.
 
 ## Local OpenAI-Compatible Endpoints
 
-You can point the tool at a local or self-hosted OpenAI-compatible server by passing `--base-url`.
+You can point the tool at a local or self-hosted OpenAI-compatible server with either:
+
+- `base_url` in `extract.toml`
+- `--base-url` for a one-off override
 
 Example with LM Studio:
 
 ```bash
-uvx fin-ai-stats-extract \
-  --input ./data/Current/11473715_T.xml \
-  --output ./output.csv \
-  --model google/gemma-3-4b \
-  --base-url http://127.0.0.1:1234/v1
+uv run fin-ai-stats-extract \
+  --base-url http://127.0.0.1:1234/v1 \
+  --model google/gemma-3-4b
 ```
 
 You can also pass an API key explicitly:
 
 ```bash
-uvx fin-ai-stats-extract \
-  --input ./data/Current \
-  --output ./output.csv \
-  --model gpt-4o-mini \
-  --api-key "$OPENAI_API_KEY"
+uv run fin-ai-stats-extract --api-key "$OPENAI_API_KEY"
 ```
 
-If `--base-url` is provided and no API key is set, the tool automatically uses `lm-studio` as a fallback key for local servers that require a non-empty value.
+If `base_url` is set and no API key is available, the tool uses `lm-studio` as a fallback key for local endpoints that require a non-empty value.
 
 ## Command-Line Arguments
 
-- `--input`: Required. Path to one XML file or a folder tree containing XML files. Folder scans are recursive.
+- `--config`: Path to a TOML config file. Defaults to `./extract.toml`.
+- `--gui`: Open a Tkinter settings window for editing values and confirming the run.
+- `--input`: Required unless `--gui` is used. Path to one XML file or a folder tree containing XML files.
 - `--output`: Output CSV path. Defaults to `output.csv`.
-- `--prompt`: Optional path to a custom system prompt markdown file. Without it, the CLI uses `./system_prompt.md`, creating it from the packaged default if needed.
-- `--model`: Model name. Defaults to `OPENAI_MODEL` or `gpt-4o-mini`.
-- `--base-url`: Optional OpenAI-compatible API base URL. Defaults to `OPENAI_BASE_URL`.
-- `--api-key`: Optional API key. Defaults to `OPENAI_API_KEY`.
-- `--temperature`: Responses API sampling temperature from `0` to `2`.
-- `--top-p`: Responses API nucleus sampling mass from `0` to `1`.
-- `--max-output-tokens`: Maximum output tokens, including reasoning tokens.
-- `--reasoning-effort`: Reasoning effort for supported `gpt-5` and `o`-series models: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`.
-- `--verbosity`: Output verbosity for supported models: `low`, `medium`, or `high`.
-- `--max-concurrency`: Maximum number of concurrent extraction jobs. Also accepts `--max-async-jobs` and `--concurrency`. Defaults to `CONCURRENCY_LIMIT` or `100`.
-- `--resume`: Resume from an existing output CSV. Requires an explicit `--output path.csv`. Already processed `source_file` values are skipped.
+- `--model`: Override the configured model.
+- `--base-url`: Override the configured OpenAI-compatible API base URL.
+- `--api-key`: Override the API key from the configured environment variable.
+- `--temperature`: Override the configured Responses API temperature from `0` to `2`.
+- `--top-p`: Override the configured nucleus sampling mass from `0` to `1`.
+- `--max-output-tokens`: Override the configured maximum output tokens.
+- `--reasoning-effort`: Override the configured reasoning effort: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`.
+- `--verbosity`: Override the configured output verbosity: `low`, `medium`, or `high`.
+- `--max-concurrency`, `--max-async-jobs`, `--concurrency`: Maximum number of concurrent extraction jobs. Defaults to `CONCURRENCY_LIMIT` or `100`.
 - `--dry-run`: Parse XML only. No API calls are made.
+- `--resume`: Resume from an existing output CSV.
 - `--sample`: Randomly process only `N` files from the input set.
-- `--yes`, `-y`: Skip the cost confirmation prompt when using OpenAI-hosted models.
 - `--verbose`: Enable debug logging.
+- `--yes`, `-y`: Skip cost confirmation.
 
-For the current OpenAI Responses API path used by this project, the commonly exposed researcher-facing controls are `temperature`, `top_p`, `max_output_tokens`, `reasoning_effort`, and `verbosity`. We recommend changing `temperature` or `top_p`, but not both at the same time.
+The most common researcher-facing controls remain `temperature`, `top_p`, `max_output_tokens`, `reasoning_effort`, and `verbosity`. In most cases, change `temperature` or `top_p`, but not both at the same time.
 
-## Streamlit UI
+## Output Schema
 
-For repository development, launch the Streamlit app with:
+The `[output]` section of `extract.toml` is the extraction contract.
 
-```bash
-uv run streamlit run src/fin_ai_stats_extract/streamlit_app.py
-```
+Each group defines:
 
-The UI lets you:
+- a top-level JSON object key
+- a group title and description
+- an ordered list of fields
 
-- drag and drop one or more XML files
-- choose OpenAI or a custom OpenAI-compatible endpoint
-- automatically load available models from the endpoint's `/models` API
-- edit the default system prompt before running extraction
-- adjust max concurrency
-- view the generated CSV directly in a table
-- download the generated CSV directly from memory without writing a CSV file to disk
+Each field defines:
+
+- the exact field name
+- the field type
+- whether null is allowed
+- the description used in the rendered model instructions
+
+The tool uses that same schema to:
+
+- build the structured output model at runtime
+- append an Output Contract section to the final instructions sent to the LLM
+- generate CSV headers in the same order
 
 ## Output
 
-The tool writes one CSV row per transcript with:
+The tool writes one CSV row per transcript.
 
-- transcript metadata: `event_id`, `company_name`, `quarter`, `date`, `headline`, `source_file`
-- AI infrastructure fields
-- AI analytics fields
-- AI talent fields
-- AI risk fields
-- non-AI physical technology investment fields
-- non-AI tech talent fields
+The CSV always begins with transcript metadata:
+
+- `event_id`
+- `company_name`
+- `quarter`
+- `date`
+- `headline`
+- `source_file`
+
+Configured extraction fields follow in the order defined in `extract.toml`.
 
 List-valued fields are serialized using a semicolon-space separator.
 

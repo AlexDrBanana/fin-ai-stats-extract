@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from typing import Literal
 
 from openai import AsyncOpenAI
+from pydantic import BaseModel
 
 from fin_ai_stats_extract.prompts import load_system_prompt
-from fin_ai_stats_extract.schema import EarningsCallExtraction
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +59,10 @@ async def extract_one(
     model: str,
     transcript: str,
     event_id: str,
+    response_model: type[BaseModel],
     system_prompt: str | None = None,
     model_settings: ExtractionModelSettings | None = None,
-) -> EarningsCallExtraction | None:
+) -> BaseModel | None:
     """Extract structured AI investment data from a single transcript.
 
     Uses the OpenAI Responses API with structured output (text_format).
@@ -80,7 +81,7 @@ async def extract_one(
                     {"role": "system", "content": prompt_text},
                     {"role": "user", "content": transcript},
                 ],
-                text_format=EarningsCallExtraction,
+                text_format=response_model,
                 **request_kwargs,
             )
 
@@ -108,7 +109,7 @@ async def extract_one(
             logger.debug("Raw response for event %s: %.500s", event_id, raw)
             if raw:
                 raw = _clean_json(raw)
-                return EarningsCallExtraction.model_validate_json(raw)
+                return response_model.model_validate_json(raw)
 
             return None
 
