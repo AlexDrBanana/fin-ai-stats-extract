@@ -15,26 +15,11 @@ You are a domain extraction system.
 """
 model = "gpt-4o-mini"
 
-[[output.groups]]
-key = "ai_talent"
-title = "AI Human Capital"
-description = "Hiring AI and ML staff."
-
-[[output.groups.fields]]
-name = "ai_talent_binary"
-type = "integer"
-description = "1 if the firm mentions AI talent investment, 0 otherwise"
-
-[[output.groups.fields]]
-name = "ai_talent_types"
-type = "string_array"
-description = "List of unique AI talent roles or areas mentioned"
-
-[[output.groups.fields]]
-name = "ai_talent_count"
-type = "integer"
-description = "Count of unique AI talent types mentioned"
-count_of = "ai_talent_types"
+[output]
+format = [
+    { name = "ai_mentioned", description = "Whether at least one core AI keyword appears" },
+    { name = "keyword_hit_count", description = "Total count of AI keyword matches" },
+]
 '''.strip(),
         encoding="utf-8",
     )
@@ -53,7 +38,8 @@ class PromptLoadingTests(unittest.TestCase):
             )
 
             self.assertIn("You are a domain extraction system.", prompt_text)
-            self.assertIn("ai_talent_binary", prompt_text)
+            self.assertIn("ai_mentioned", prompt_text)
+            self.assertIn("Whether at least one core AI keyword appears", prompt_text)
             self.assertNotIn("system_prompt.md", prompt_text)
 
     def test_workdir_extract_toml_is_used_by_default(self) -> None:
@@ -64,8 +50,7 @@ class PromptLoadingTests(unittest.TestCase):
             prompt_text = load_system_prompt(working_directory=workdir)
 
             self.assertIn("## Output Contract", prompt_text)
-            self.assertIn("ai_talent", prompt_text)
-            self.assertIn("Count fields must equal the number of items", prompt_text)
+            self.assertIn("ai_mentioned", prompt_text)
 
     def test_missing_workdir_extract_toml_is_copied_from_package_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -75,4 +60,4 @@ class PromptLoadingTests(unittest.TestCase):
 
             self.assertTrue((workdir / "extract.toml").exists())
             self.assertIn("## Output Contract", prompt_text)
-            self.assertIn("ai_infrastructure", prompt_text)
+            self.assertIn("ai_mentioned", prompt_text)

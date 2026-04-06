@@ -2,6 +2,7 @@ import asyncio
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 from fin_ai_stats_extract.config import load_config
 from fin_ai_stats_extract.pipeline import run_pipeline
@@ -18,15 +19,11 @@ Use transcript evidence only.
 """
 model = "gpt-4o-mini"
 
-[[output.groups]]
-key = "tech_talent"
-title = "Tech Human Capital"
-description = "Software engineers and related roles."
-
-[[output.groups.fields]]
-name = "tech_talent_binary"
-type = "integer"
-description = "1 if the firm mentions non-AI tech talent investment, 0 otherwise"
+[output]
+format = [
+    { name = "ai_mentioned", description = "Whether at least one core AI keyword appears" },
+    { name = "keyword_hit_count", description = "Total count of AI keyword matches" },
+]
 '''.strip(),
         encoding="utf-8",
     )
@@ -73,3 +70,52 @@ class PipelineTests(unittest.TestCase):
             )
 
             self.assertFalse(output_path.exists())
+
+    def test_run_pipeline_overwrites_existing_output_without_name_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workdir = Path(temp_dir)
+            config = load_config(_write_config(workdir))
+            xml_path = _write_xml(workdir)
+            output_path = workdir / "output.csv"
+            output_path.write_text("existing-output\n", encoding="utf-8")
+            response_model = build_extraction_model(config)
+            extraction = response_model.model_validate(
+                {
+                    "ai_mentioned": "yes",
+                    "keyword_hit_count": "1",
+                }
+            )
+
+            with (
+                patch("fin_ai_stats_extract.pipeline.AsyncOpenAI"),
+                patch(
+                    "fin_ai_stats_extract.pipeline.initialize_output_csv"
+                ) as mock_initialize,
+                patch("fin_ai_stats_extract.pipeline.append_csv") as mock_append,
+                patch(
+                    "fin_ai_stats_extract.pipeline.extract_one",
+                    new=AsyncMock(return_value=extraction),
+                ),
+            ):
+                asyncio.run(
+                    run_pipeline(
+                        input_path=xml_path,
+                        output_path=output_path,
+                        system_prompt="Use transcript evidence only.",
+                        model="gpt-4o-mini",
+                        model_settings=None,
+                        max_concurrency=1,
+                        response_model=response_model,
+                        output_config=config.output,
+                        api_key="test-key",
+                        dry_run=False,
+                        skip_confirm=True,
+                    )
+                )
+
+            mock_initialize.assert_called_once_with(
+                output_path,
+                output_config=config.output,
+                overwrite=True,
+            )
+            mock_append.assert_called_once()

@@ -1,18 +1,111 @@
 [llm]
 instructions = """
-You are a financial analyst AI specializing in extracting structured data about technology and AI investments from earnings conference call transcripts.
+You are a financial analyst AI specializing in detecting and classifying AI-related discussion in earnings conference call transcripts.
 
-Be precise and conservative. Only extract information that is explicitly stated or strongly implied in the transcript.
+Your task is to analyse the full transcript text and produce a structured result with five stages:
+1. AI Mention Detection — decide whether AI is discussed and count keyword hits.
+2. Representative Sentence Selection — extract the most AI-keyword-dense sentences.
+3. Attitude Classification — score excited vs concerned language in AI-relevant sentences.
+4. Initiator Attribution — determine who raised AI first (management, analyst, both, or unclear).
+5. Confidence Classification — assess management's confidence level on AI topics.
 
-Apply these rules when producing the structured result:
-- For binary fields, use 1 if the category is mentioned and 0 if it is absent.
-- For list fields, return unique concise labels with no repetition.
-- For nullable numeric or string fields, use null when the transcript does not disclose the value.
-- Prefer null over guessing for numeric fields.
-- Distinguish AI-specific investments from broader non-AI technology investments.
-- Earlier transcripts may contain no AI discussion; zeros and nulls are acceptable when warranted by the evidence.
+## Stage 1 — AI Mention Detection
+
+Use two tiers of keywords (case-insensitive, match on word boundaries).
+
+Core keywords (any single match → ai_mentioned = "yes"):
+  artificial intelligence, machine learning, deep learning, neural network,
+  large language model, llm, generative ai, gen ai, foundation model,
+  ai model, ai system, ai platform, ai tool, ai capability, gpu, nvidia,
+  h100, a100, tpu, training cluster, azure openai, openai, anthropic, copilot,
+  ai assistant, ai agent, ai feature, ai product, ai rollout, ai deployment,
+  ai integration, ai adoption, ai pilot, chatbot, ai workflow, ai automation,
+  ai investment, ai engineer, ml engineer, data scientist, ai talent, ai hiring.
+
+Contextual keywords (count only when a core keyword is also present):
+  inference, data center, datacenter, accelerator, google cloud, aws,
+  capex, capital expenditure.
+
+Set ai_mentioned to "yes" if at least one core keyword appears, otherwise "no".
+Set keyword_hit_count to the total number of keyword matches (core + contextual when applicable, 0 when ai_mentioned is "no").
+
+## Stage 2 — Representative Sentences
+
+From the transcript, select up to 3 sentences with the highest density of AI keyword matches.
+Join them with " | " as the separator into the top_sentences field.
+If ai_mentioned is "no", set top_sentences to an empty string.
+
+## Stage 3 — Attitude Classification (only when ai_mentioned = "yes")
+
+Isolate every sentence that contains at least one AI keyword. Score each sentence against two stem lexicons:
+
+Excited stems: opportunit, excit, transform, growth, enhanc, improv, accelerat, innovat,
+  breakthrough, leading, benefit, efficienc, productiv, unlock, upside, optimis, optimiz,
+  enthusiast, differentiat, leverage, monetiz, momentum, traction, scale, launch, deploy,
+  partner, customer, demand, leadership, competitive advantage.
+
+Concerned stems: risk, concern, challeng, uncertain, threat, disrupt, regulat, complian,
+  ethic, bias, safety, job loss, replac, displace, expensive, costly, cost, difficult,
+  headwind, caution, cautious, worry, worri, fear, pressure, cannibali, competit, obsolet,
+  lag, behind, barrier, liabilit, lawsuit, legal, restrict, data privacy, security, breach,
+  hallucin, unreliab, inaccura, mistake.
+
+Classification rule:
+  If excited_score > concerned_score × 1.5 → "excited"
+  If concerned_score > excited_score × 1.5 → "concerned"
+  Otherwise → "neutral"
+  If ai_mentioned is "no" → "n/a"
+
+## Stage 4 — Initiator Attribution (only when ai_mentioned = "yes")
+
+StreetEvents transcripts have two named sections separated by lines of "=" characters:
+  "Presentation" — management prepared remarks
+  "Questions and Answers" — interactive Q&A
+
+Rules:
+  If AI keyword in Presentation AND in Q&A → "both"
+  If AI keyword in Presentation only → "management"
+  If AI keyword in Q&A only:
+    If first AI-containing turn is by an analyst → "analyst"
+    If first AI-containing turn is by management → "management"
+  If sections cannot be identified → "unclear"
+  If ai_mentioned is "no" → "n/a"
+
+Speakers under "Corporate Participants" are management; under "Conference Call Participants" are analysts. The "Operator" is neither.
+
+## Stage 5 — Confidence Classification (only when ai_mentioned = "yes")
+
+Score AI-relevant sentences on four dimensions:
+
+hedge_score: count of sentences containing future/conditional stems
+  (expect, hope, target, aim, plan, will, could, may, might, should, anticipat, intend, look to, when we, if we).
+
+exec_score: count of sentences containing execution/delivery stems
+  (ship, launch, achiev, announc, record, sign, deploy, deliver, won, ramp, generat, report, demonstrat, complet).
+
+quant_score: count of sentences containing at least one quantitative pattern
+  ($N, N%, GenN, N billion/million/trillion, Nx, N gig).
+
+strat_score: count of sentences containing market-expansion stems
+  (market opportunit, tam, new phase, new growth, new era, redefin, pioneer, greenfield, consorti, footprint, multi billion).
+
+confidence_label decision tree (n = number of AI-relevant sentences):
+  If n < 3 → "hopeful"
+  If strat_rate >= 0.12 AND strat_score >= 4 → "transformational"
+  If hedge_rate <= 0.05 → "authoritative"
+  If exec_rate >= 0.45 AND quant_rate >= 0.08 AND hedge_rate <= 0.12 → "confident"
+  Otherwise → "hopeful"
+
+If ai_mentioned is "no" → "n/a"
+
+## General Rules
+- Be precise and conservative. Only extract information explicitly stated or strongly implied.
+- Return configured extraction fields as strings.
+- Use an empty string when ai_mentioned is "no" or a field is not applicable.
+- Use string numerals such as "0", "3", or "12" for count-like fields.
+- Apply all rules as described; do not hallucinate keyword matches or attitude signals.
 """
-model = "gpt-4o-mini"
+model = "gpt-5.4-mini"
 api_key_env = "OPENAI_API_KEY"
 # temperature = 0.2
 # top_p = 0.9
@@ -21,155 +114,16 @@ api_key_env = "OPENAI_API_KEY"
 # verbosity = "low"
 # base_url = "http://127.0.0.1:1234/v1"
 
-[[output.groups]]
-key = "ai_infrastructure"
-title = "AI Infrastructure"
-description = "Data centers, chips, hardware, cloud compute, and other AI-specific infrastructure."
-
-[[output.groups.fields]]
-name = "ai_infra_binary"
-type = "integer"
-description = "1 if the firm mentions investment in AI infrastructure, 0 otherwise"
-
-[[output.groups.fields]]
-name = "ai_infra_types"
-type = "string_array"
-description = "List of unique AI infrastructure types mentioned"
-
-[[output.groups.fields]]
-name = "ai_infra_count"
-type = "integer"
-description = "Count of unique AI infrastructure types mentioned"
-count_of = "ai_infra_types"
-
-[[output.groups.fields]]
-name = "ai_infra_dollar"
-type = "number"
-nullable = true
-description = "Dollar value invested in AI infrastructure, or null if not disclosed"
-
-[[output.groups]]
-key = "ai_analytics"
-title = "AI Analytics"
-description = "Models, algorithms, AI-powered applications, and other AI software investments."
-
-[[output.groups.fields]]
-name = "ai_analytics_binary"
-type = "integer"
-description = "1 if the firm mentions investment in AI analytics, models, or applications, 0 otherwise"
-
-[[output.groups.fields]]
-name = "ai_analytics_types"
-type = "string_array"
-description = "List of unique AI analytics types mentioned"
-
-[[output.groups.fields]]
-name = "ai_analytics_count"
-type = "integer"
-description = "Count of unique AI analytics types mentioned"
-count_of = "ai_analytics_types"
-
-[[output.groups.fields]]
-name = "ai_analytics_dollar"
-type = "number"
-nullable = true
-description = "Dollar value invested in AI analytics, or null if not disclosed"
-
-[[output.groups]]
-key = "ai_talent"
-title = "AI Human Capital"
-description = "Hiring, retaining, and training AI-specific talent such as ML engineers and researchers."
-
-[[output.groups.fields]]
-name = "ai_talent_binary"
-type = "integer"
-description = "1 if the firm mentions investment in AI talent or hiring, 0 otherwise"
-
-[[output.groups.fields]]
-name = "ai_talent_types"
-type = "string_array"
-description = "List of unique AI talent roles or areas mentioned"
-
-[[output.groups.fields]]
-name = "ai_talent_count"
-type = "integer"
-description = "Count of unique AI talent types mentioned"
-count_of = "ai_talent_types"
-
-[[output.groups.fields]]
-name = "ai_talent_dollar"
-type = "number"
-nullable = true
-description = "Dollar value invested in AI talent, or null if not disclosed"
-
-[[output.groups.fields]]
-name = "ai_talent_headcount"
-type = "number"
-nullable = true
-description = "Number of AI workers mentioned, or null if not disclosed"
-
-[[output.groups]]
-key = "ai_risk"
-title = "AI Risks and Barriers"
-description = "AI-related risks, barriers, constraints, or challenges mentioned by the firm."
-
-[[output.groups.fields]]
-name = "ai_risk_binary"
-type = "integer"
-description = "1 if the firm mentions AI-related risks, barriers, or challenges, 0 otherwise"
-
-[[output.groups.fields]]
-name = "ai_risk_types"
-type = "string_array"
-description = "List of unique AI risk or barrier themes mentioned"
-
-[[output.groups.fields]]
-name = "ai_risk_count"
-type = "integer"
-description = "Count of unique AI risk or barrier themes mentioned"
-count_of = "ai_risk_types"
-
-[[output.groups.fields]]
-name = "ai_risk_sentiment"
-type = "string"
-nullable = true
-enum = ["positive", "negative", "mixed"]
-description = "Overall tone of the AI risk discussion, or null if no risk discussion is present"
-
-[[output.groups]]
-key = "tech_physical"
-title = "Non-AI Physical Technology Investment"
-description = "R&D facilities, labs, equipment, and non-AI technical infrastructure."
-
-[[output.groups.fields]]
-name = "tech_phys_binary"
-type = "integer"
-description = "1 if the firm mentions non-AI physical technology investment, 0 otherwise"
-
-[[output.groups.fields]]
-name = "tech_phys_dollar"
-type = "number"
-nullable = true
-description = "Dollar value of non-AI physical technology investment, or null if not disclosed"
-
-[[output.groups]]
-key = "tech_talent"
-title = "Non-AI Tech Human Capital"
-description = "Software engineers, IT staff, cybersecurity professionals, and other non-AI technical roles."
-
-[[output.groups.fields]]
-name = "tech_talent_binary"
-type = "integer"
-description = "1 if the firm mentions non-AI tech talent investment, 0 otherwise"
-
-[[output.groups.fields]]
-name = "tech_talent_headcount"
-type = "number"
-nullable = true
-description = "Number of non-AI tech workers mentioned, or null if not disclosed"
-
-[[output.groups.fields]]
-name = "tech_talent_dollar"
-type = "number"
-nullable = true
-description = "Dollar value invested in non-AI tech talent, or null if not disclosed"
+[output]
+format = [
+  { name = "ai_mentioned", description = "Whether at least one core AI keyword appears in the transcript" },
+  { name = "keyword_hit_count", description = "Total count of AI keyword matches (core + contextual when applicable, 0 when ai_mentioned is no)" },
+  { name = "top_sentences", description = "Up to 3 most AI-keyword-dense sentences joined by ' | ', or empty string when ai_mentioned is no" },
+  { name = "ai_attitude", description = "Overall attitude toward AI: excited, concerned, neutral, or n/a when AI is not mentioned" },
+  { name = "ai_initiator", description = "Who initiated the AI discussion: management, analyst, both, unclear, or n/a" },
+  { name = "confidence_label", description = "Confidence level: hopeful, confident, transformational, authoritative, or n/a" },
+  { name = "hedge_score", description = "Count of AI sentences containing future/conditional language (0 when AI not mentioned)" },
+  { name = "exec_score", description = "Count of AI sentences containing execution/delivery language (0 when AI not mentioned)" },
+  { name = "quant_score", description = "Count of AI sentences containing quantitative patterns (0 when AI not mentioned)" },
+  { name = "strat_score", description = "Count of AI sentences containing market-expansion language (0 when AI not mentioned)" },
+]

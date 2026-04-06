@@ -196,7 +196,7 @@ async def run_pipeline(
         logger.error("OpenAI API key not set. Pass --api-key or set OPENAI_API_KEY.")
         raise SystemExit(1)
 
-    if overwrite_output:
+    if planned_run.overwrite_output:
         logger.info(
             "Starting fresh run: overwriting existing output CSV %s", output_path
         )

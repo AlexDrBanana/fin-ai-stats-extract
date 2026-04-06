@@ -17,15 +17,10 @@ Use transcript evidence only.
 model = "gpt-4o-mini"
 temperature = 0.2
 
-[[output.groups]]
-key = "tech_talent"
-title = "Tech Human Capital"
-description = "Software engineers and related roles."
-
-[[output.groups.fields]]
-name = "tech_talent_binary"
-type = "integer"
-description = "1 if the firm mentions non-AI tech talent investment, 0 otherwise"
+[output]
+format = [
+    { name = "tech_talent_binary", description = "1 if the firm mentions non-AI tech talent investment, 0 otherwise" },
+]
 '''.strip(),
         encoding="utf-8",
     )

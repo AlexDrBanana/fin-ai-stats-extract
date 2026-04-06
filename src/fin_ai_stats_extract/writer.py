@@ -1,5 +1,6 @@
 import csv
 import io
+from enum import Enum
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -20,8 +21,7 @@ _METADATA_COLUMNS = [
 
 def build_csv_columns(output_config: OutputConfig) -> list[str]:
     columns = list(_METADATA_COLUMNS)
-    for group in output_config.groups:
-        columns.extend(field.name for field in group.fields)
+    columns.extend(field.name for field in output_config.format)
     return columns
 
 
@@ -40,18 +40,22 @@ def _flatten_row(
         "source_file": meta.source_file,
     }
 
-    for group in output_config.groups:
-        group_value = getattr(extraction, group.key)
-        for field in group.fields:
-            value = getattr(group_value, field.name)
-            if isinstance(value, list):
-                row[field.name] = "; ".join(str(item) for item in value)
-            elif isinstance(value, (int, float)) or value is None:
-                row[field.name] = _fmt_num(value)
-            else:
-                row[field.name] = str(value)
+    for field in output_config.format:
+        value = getattr(extraction, field.name)
+        if isinstance(value, list):
+            row[field.name] = "; ".join(_fmt_scalar(item) for item in value)
+        elif isinstance(value, (int, float)) or value is None:
+            row[field.name] = _fmt_num(value)
+        else:
+            row[field.name] = _fmt_scalar(value)
 
     return row
+
+
+def _fmt_scalar(value: object) -> str:
+    if isinstance(value, Enum):
+        return str(value.value)
+    return str(value)
 
 
 def _fmt_num(val: float | None) -> str:

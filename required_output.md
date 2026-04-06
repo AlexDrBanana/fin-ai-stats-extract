@@ -1,45 +1,29 @@
-**Category 1: Firms' AI Investments**
+**AI Mention Detection, Attitude Classification, Initiator Attribution, and Confidence Classification**
 
-Three sub-categories, each with the same output structure:
+Five stages applied to each earnings call transcript. Full methodology is encoded in the LLM instructions within `extract.toml`.
 
-**1a. AI Infrastructure** (Data centers, chips, hardware, cloud compute, etc.)
+In `extract.toml`, these outputs are configured as a flat `[output].format` list. Each field has a name and a freeform description that is passed directly into the LLM instructions.
 
-* ai\_infra\_binary: 1/0 — does the firm mention investment in AI infrastructure?
-* ai\_infra\_types: list of unique types mentioned (no repetition)
-* ai\_infra\_count: count of unique types
-* **ai\_infra\_dollar**: dollar value invested (or NaN)
+**Stage 1 — AI Mention Detection**
 
-**1b. AI Analytics** (Models, algorithms, AI-powered applications/products, etc.)
+- ai_mentioned: "yes" / "no" — whether at least one core AI keyword appears
+- keyword_hit_count: total keyword matches (core + contextual when applicable, 0 when no)
+- top_sentences: up to 3 most keyword-dense sentences joined by " | ", or null
 
-* ai\_analytics\_binary: 1/0
-* ai\_analytics\_types: list of unique types
-* ai\_analytics\_count: count of unique types
-* **ai\_analytics\_dollar**: dollar value invested (or NaN)
+**Stage 2 — Attitude Classification**
 
-**1c. AI Human Capital** (Hiring AI/ML engineers, data scientists, AI research talent, etc.)
+- ai_attitude: "excited" / "concerned" / "neutral" / "n/a"
 
-* ai\_talent\_binary: 1/0
-* ai\_talent\_types: list of unique roles/talent areas
-* ai\_talent\_count: count of unique types
-* **ai\_talent\_dollar**: dollar value invested (or NaN)
-* **ai\_talent\_headcount**: number of AI workers (or NaN)
+**Stage 3 — Initiator Attribution**
 
-**1d. AI Other — Risks/Barriers/Challenges**
+- ai_initiator: "management" / "analyst" / "both" / "unclear" / "n/a"
 
-* ai\_risk\_binary: 1/0 — does the firm mention AI-related risks, barriers, or challenges?
-* ai\_risk\_types: list of unique risk/barrier themes (e.g., regulatory, ethical, technical debt, talent shortage)
-* ai\_risk\_count: count of unique themes
-* Optionally: ai\_risk\_sentiment: a severity or tone indicator (positive framing vs. negative framing)
+**Stage 4 — Confidence Classification**
 
-**Category 2: Non-AI Technology/Innovation Investments**
+- confidence_label: "hopeful" / "confident" / "transformational" / "authoritative" / "n/a"
+- hedge_score: count of AI sentences with future/conditional language
+- exec_score: count of AI sentences with execution/delivery language
+- quant_score: count of AI sentences with quantitative patterns
+- strat_score: count of AI sentences with market-expansion language
 
-**2a. Physical Investment** (R&D facilities, labs, tech equipment — excluding AI)
-
-* tech\_phys\_binary: 1/0
-* tech\_phys\_dollar: actual dollar value (extracted or NaN if not disclosed)
-
-**2b. Tech Human Capital** (Software engineers, IT staff, non-AI tech roles)
-
-* tech\_talent\_binary: 1/0
-* tech\_talent\_headcount: number of people (or NaN)
-* tech\_talent\_dollar: dollar value of investment (or NaN)
+**Note:** The tool's metadata columns (`event_id`, `company_name`, `quarter`, `date`, `headline`, `source_file`) are fixed in the writer and differ from the expert's example CSV headers (`filename`, `company`, `ticker`, `date`). A future code change can align these if needed.

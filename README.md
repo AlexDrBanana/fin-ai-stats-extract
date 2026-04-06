@@ -2,13 +2,21 @@
 
 ## Overview
 
-`fin-ai-stats-extract` extracts structured AI and technology investment data from XML earnings-call transcripts and writes the results to CSV.
+`fin-ai-stats-extract` detects and classifies AI-related discussion in XML earnings-call transcripts and writes the results to CSV.
 
-The tool is now driven by a single TOML config file, `extract.toml`, which defines:
+The tool implements a five-stage methodology via LLM extraction:
+
+1. **AI Mention Detection** — keyword-based yes/no decision and hit count
+2. **Representative Sentence Selection** — up to 3 most keyword-dense sentences
+3. **Attitude Classification** — excited / concerned / neutral tone label
+4. **Initiator Attribution** — who raised AI first (management, analyst, both, unclear)
+5. **Confidence Classification** — hopeful / confident / transformational / authoritative
+
+The tool is driven by a single TOML config file, `extract.toml`, which defines:
 
 - the base extraction instructions sent to the model
 - model and endpoint settings
-- the structured output groups and fields
+- the ordered output field list
 
 That same config drives three things at once:
 
@@ -46,9 +54,21 @@ If you run the tool without `--config` and `extract.toml` does not exist in the 
 The default config includes:
 
 - commented-out optional settings such as `temperature`, `top_p`, and `reasoning_effort`
-- the full grouped output schema for AI and non-AI investment extraction
+- the full methodology for AI mention detection, attitude classification, initiator attribution, and confidence classification
 
 Edit `extract.toml` directly to change AI instructions, AI model settings, or output fields.
+
+The output contract now uses a flat ordered list:
+
+```toml
+[output]
+format = [
+  { name = "ai_mentioned", description = "Whether at least one core AI keyword appears" },
+  { name = "keyword_hit_count", description = "Total count of AI keyword matches" },
+]
+```
+
+Descriptions are passed through directly into the rendered LLM instructions. The program does not parse or validate description text beyond requiring it to be non-empty.
 
 ## Environment
 
@@ -185,18 +205,11 @@ The most common researcher-facing controls remain `temperature`, `top_p`, `max_o
 
 The `[output]` section of `extract.toml` is the extraction contract.
 
-Each group defines:
-
-- a top-level JSON object key
-- a group title and description
-- an ordered list of fields
-
-Each field defines:
+Each item in `format` defines:
 
 - the exact field name
-- the field type
-- whether null is allowed
-- the description used in the rendered model instructions
+- the output order used in both the JSON contract and CSV columns
+- a freeform description that is copied directly into the model instructions
 
 The tool uses that same schema to:
 

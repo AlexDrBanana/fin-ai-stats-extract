@@ -1,4 +1,3 @@
-from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field, create_model
@@ -119,47 +118,16 @@ class EarningsCallExtraction(BaseModel):
 
 
 def _field_annotation(field: OutputFieldConfig) -> tuple[Any, Any]:
-    if field.type == "integer":
-        annotation: Any = int
-    elif field.type == "number":
-        annotation = float
-    elif field.type == "string":
-        if field.enum:
-            enum_name = f"{field.name.title().replace('_', '')}Enum"
-            annotation = Enum(
-                enum_name, {value.upper(): value for value in field.enum}, type=str
-            )
-        else:
-            annotation = str
-    elif field.type == "string_array":
-        annotation = list[str]
-    else:  # pragma: no cover - guarded by config validation
-        raise ValueError(f"unsupported field type: {field.type}")
-
-    if field.nullable:
-        return annotation | None, Field(default=None, description=field.description)
-    return annotation, Field(..., description=field.description)
+    return str, Field(..., description=field.description)
 
 
 def build_extraction_model(config: ExtractConfig) -> type[BaseModel]:
-    group_models: dict[str, tuple[type[BaseModel], Any]] = {}
-
-    for group in config.output.groups:
-        field_definitions = {
-            field.name: _field_annotation(field) for field in group.fields
-        }
-        group_model = create_model(
-            f"{group.key.title().replace('_', '')}Output",
-            __base__=BaseModel,
-            **field_definitions,
-        )
-        group_models[group.key] = (
-            group_model,
-            Field(..., description=group.description),
-        )
+    field_definitions = {
+        field.name: _field_annotation(field) for field in config.output.format
+    }
 
     return create_model(
         "ConfiguredExtractionOutput",
         __base__=BaseModel,
-        **group_models,
+        **field_definitions,
     )

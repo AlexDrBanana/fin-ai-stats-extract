@@ -14,48 +14,14 @@ Only use evidence from the transcript.
 """
 model = "gpt-4o-mini"
 
-[[output.groups]]
-key = "ai_infrastructure"
-title = "AI Infrastructure"
-description = "Data centers, chips, hardware, cloud compute, etc."
-
-[[output.groups.fields]]
-name = "ai_infra_binary"
-type = "integer"
-description = "1 if the firm mentions AI infrastructure investment, 0 otherwise"
-
-[[output.groups.fields]]
-name = "ai_infra_types"
-type = "string_array"
-description = "List of unique AI infrastructure types mentioned"
-
-[[output.groups.fields]]
-name = "ai_infra_count"
-type = "integer"
-description = "Count of unique AI infrastructure types mentioned"
-count_of = "ai_infra_types"
-
-[[output.groups.fields]]
-name = "ai_infra_dollar"
-type = "number"
-nullable = true
-description = "Dollar value invested in AI infrastructure, or null if not disclosed"
-
-[[output.groups]]
-key = "tech_talent"
-title = "Tech Human Capital"
-description = "Software engineers, IT staff, and non-AI technical roles."
-
-[[output.groups.fields]]
-name = "tech_talent_binary"
-type = "integer"
-description = "1 if the firm mentions non-AI tech talent investment, 0 otherwise"
-
-[[output.groups.fields]]
-name = "tech_talent_headcount"
-type = "number"
-nullable = true
-description = "Number of non-AI tech workers mentioned, or null if not disclosed"
+[output]
+format = [
+    { name = "ai_mentioned", description = "Whether at least one core AI keyword appears" },
+    { name = "keyword_hit_count", description = "Total count of AI keyword matches" },
+    { name = "top_sentences", description = "Up to 3 most AI-keyword-dense sentences joined by pipe, or null" },
+    { name = "confidence_label", description = "Confidence level label" },
+    { name = "hedge_score", description = "Count of AI sentences with future or conditional language" },
+]
 '''.strip(),
         encoding="utf-8",
     )
@@ -63,7 +29,7 @@ description = "Number of non-AI tech workers mentioned, or null if not disclosed
 
 
 class ConfigTests(unittest.TestCase):
-    def test_load_config_parses_llm_runtime_and_output_groups(self) -> None:
+    def test_load_config_parses_llm_runtime_and_flat_output_format(self) -> None:
         from fin_ai_stats_extract.config import load_config
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -73,9 +39,16 @@ class ConfigTests(unittest.TestCase):
             config = load_config(config_path)
 
             self.assertEqual(config.llm.model, "gpt-4o-mini")
-            self.assertEqual(len(config.output.groups), 2)
+            self.assertEqual(len(config.output.format), 5)
+            self.assertEqual(config.output.format[0].name, "ai_mentioned")
             self.assertEqual(
-                config.output.groups[0].fields[2].count_of, "ai_infra_types"
+                config.output.format[0].description,
+                "Whether at least one core AI keyword appears",
+            )
+            self.assertEqual(config.output.format[2].name, "top_sentences")
+            self.assertEqual(
+                config.output.format[2].description,
+                "Up to 3 most AI-keyword-dense sentences joined by pipe, or null",
             )
 
     def test_render_system_prompt_appends_output_contract(self) -> None:
@@ -91,12 +64,14 @@ class ConfigTests(unittest.TestCase):
 
             self.assertIn("You are a careful extraction system.", prompt)
             self.assertIn("## Output Contract", prompt)
-            self.assertIn("ai_infrastructure", prompt)
-            self.assertIn("ai_infra_binary", prompt)
-            self.assertIn("string[]", prompt)
-            self.assertIn("Count fields must equal the number of items", prompt)
+            self.assertIn("ai_mentioned", prompt)
+            self.assertIn("confidence_label", prompt)
+            self.assertIn("Whether at least one core AI keyword appears", prompt)
+        self.assertNotIn("### ai_mention", prompt)
 
-    def test_build_extraction_model_uses_group_and_field_names(self) -> None:
+    def test_build_extraction_model_uses_top_level_field_names_without_type_inference(
+        self,
+    ) -> None:
         from fin_ai_stats_extract.config import load_config
         from fin_ai_stats_extract.schema import build_extraction_model
 
@@ -108,21 +83,31 @@ class ConfigTests(unittest.TestCase):
             extraction_model = build_extraction_model(config)
             instance = extraction_model.model_validate(
                 {
-                    "ai_infrastructure": {
-                        "ai_infra_binary": 1,
-                        "ai_infra_types": ["GPU clusters"],
-                        "ai_infra_count": 1,
-                        "ai_infra_dollar": None,
-                    },
-                    "tech_talent": {
-                        "tech_talent_binary": 0,
-                        "tech_talent_headcount": None,
-                    },
+                    "ai_mentioned": "yes",
+                    "keyword_hit_count": "12",
+                    "top_sentences": "We invested in GPU clusters. | Our AI strategy is working.",
+                    "confidence_label": "confident",
+                    "hedge_score": "3",
                 }
             )
 
-            self.assertEqual(instance.ai_infrastructure.ai_infra_binary, 1)
+            self.assertEqual(instance.ai_mentioned, "yes")
+            self.assertEqual(instance.keyword_hit_count, "12")
+            self.assertEqual(instance.confidence_label, "confident")
+
+    def test_build_extraction_model_emits_string_json_schema_types(self) -> None:
+        from fin_ai_stats_extract.config import load_config
+        from fin_ai_stats_extract.schema import build_extraction_model
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workdir = Path(temp_dir)
+            config_path = _write_config(workdir)
+
+            config = load_config(config_path)
+            extraction_model = build_extraction_model(config)
+            schema = extraction_model.model_json_schema()
+
+            self.assertEqual(schema["properties"]["ai_mentioned"]["type"], "string")
             self.assertEqual(
-                instance.ai_infrastructure.ai_infra_types, ["GPU clusters"]
+                schema["properties"]["keyword_hit_count"]["type"], "string"
             )
-            self.assertIsNone(instance.tech_talent.tech_talent_headcount)

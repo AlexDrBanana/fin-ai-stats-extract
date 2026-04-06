@@ -1,11 +1,8 @@
+import tomllib
 from importlib.resources import files
 from pathlib import Path
-import tomllib
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
-FieldType = Literal["integer", "number", "string", "string_array"]
 
 DEFAULT_CONFIG_FILENAME = "extract.toml"
 
@@ -14,11 +11,7 @@ class OutputFieldConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    type: FieldType
     description: str
-    nullable: bool = False
-    count_of: str | None = None
-    enum: list[str] | None = None
 
     @field_validator("name", "description")
     @classmethod
@@ -29,40 +22,17 @@ class OutputFieldConfig(BaseModel):
         return value
 
 
-class OutputGroupConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    key: str
-    title: str
-    description: str
-    fields: list[OutputFieldConfig]
-
-    @field_validator("key", "title", "description")
-    @classmethod
-    def _validate_non_empty(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError("value must not be empty")
-        return value
-
-    @model_validator(mode="after")
-    def _validate_unique_field_names(self) -> "OutputGroupConfig":
-        field_names = [field.name for field in self.fields]
-        if len(field_names) != len(set(field_names)):
-            raise ValueError(f"duplicate field names found in group {self.key}")
-        return self
-
-
 class OutputConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    groups: list[OutputGroupConfig] = Field(default_factory=list)
+    format: list[OutputFieldConfig] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _validate_unique_group_keys(self) -> "OutputConfig":
-        group_keys = [group.key for group in self.groups]
-        if len(group_keys) != len(set(group_keys)):
-            raise ValueError("duplicate output group keys found")
+    def _validate_unique_field_names(self) -> "OutputConfig":
+        field_names = [field.name for field in self.format]
+        if len(field_names) != len(set(field_names)):
+            raise ValueError("duplicate output field names found")
+
         return self
 
 
@@ -121,4 +91,5 @@ def load_config(
         resolved_path = config_path
     with resolved_path.open("rb") as handle:
         raw_config = tomllib.load(handle)
+    return ExtractConfig.model_validate(raw_config)
     return ExtractConfig.model_validate(raw_config)

@@ -17,47 +17,14 @@ Use transcript evidence only.
 """
 model = "gpt-4o-mini"
 
-[[output.groups]]
-key = "ai_infrastructure"
-title = "AI Infrastructure"
-description = "Data centers, chips, hardware, cloud compute, etc."
-
-[[output.groups.fields]]
-name = "ai_infra_binary"
-type = "integer"
-description = "1 if the firm mentions AI infrastructure investment, 0 otherwise"
-
-[[output.groups.fields]]
-name = "ai_infra_types"
-type = "string_array"
-description = "List of unique AI infrastructure types mentioned"
-
-[[output.groups.fields]]
-name = "ai_infra_count"
-type = "integer"
-description = "Count of unique AI infrastructure types mentioned"
-
-[[output.groups.fields]]
-name = "ai_infra_dollar"
-type = "number"
-nullable = true
-description = "Dollar value invested in AI infrastructure, or null if not disclosed"
-
-[[output.groups]]
-key = "tech_talent"
-title = "Tech Human Capital"
-description = "Software engineers and related roles."
-
-[[output.groups.fields]]
-name = "tech_talent_binary"
-type = "integer"
-description = "1 if the firm mentions non-AI tech talent investment, 0 otherwise"
-
-[[output.groups.fields]]
-name = "tech_talent_headcount"
-type = "number"
-nullable = true
-description = "Number of non-AI tech workers mentioned, or null if not disclosed"
+[output]
+format = [
+    { name = "ai_mentioned", description = "Whether at least one core AI keyword appears" },
+    { name = "keyword_hit_count", description = "Total count of AI keyword matches" },
+    { name = "top_sentences", description = "Up to 3 most AI-keyword-dense sentences joined by pipe, or null" },
+    { name = "confidence_label", description = "Confidence level label" },
+    { name = "hedge_score", description = "Count of AI sentences with future or conditional language" },
+]
 '''.strip(),
         encoding="utf-8",
     )
@@ -83,12 +50,11 @@ class WriterTests(unittest.TestCase):
                     "date",
                     "headline",
                     "source_file",
-                    "ai_infra_binary",
-                    "ai_infra_types",
-                    "ai_infra_count",
-                    "ai_infra_dollar",
-                    "tech_talent_binary",
-                    "tech_talent_headcount",
+                    "ai_mentioned",
+                    "keyword_hit_count",
+                    "top_sentences",
+                    "confidence_label",
+                    "hedge_score",
                 ],
             )
 
@@ -101,16 +67,11 @@ class WriterTests(unittest.TestCase):
             extraction_model = build_extraction_model(config)
             extraction = extraction_model.model_validate(
                 {
-                    "ai_infrastructure": {
-                        "ai_infra_binary": 1,
-                        "ai_infra_types": ["GPU clusters", "custom chips"],
-                        "ai_infra_count": 2,
-                        "ai_infra_dollar": 2500000,
-                    },
-                    "tech_talent": {
-                        "tech_talent_binary": 1,
-                        "tech_talent_headcount": None,
-                    },
+                    "ai_mentioned": "yes",
+                    "keyword_hit_count": "10",
+                    "top_sentences": "We deploy GPUs. | AI is transformative.",
+                    "confidence_label": "hopeful",
+                    "hedge_score": "4",
                 }
             )
             metadata = TranscriptMetadata(
@@ -126,6 +87,11 @@ class WriterTests(unittest.TestCase):
 
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["event_id"], "123")
-            self.assertEqual(rows[0]["ai_infra_types"], "GPU clusters; custom chips")
-            self.assertEqual(rows[0]["ai_infra_dollar"], "2500000")
-            self.assertEqual(rows[0]["tech_talent_headcount"], "")
+            self.assertEqual(rows[0]["ai_mentioned"], "yes")
+            self.assertEqual(rows[0]["keyword_hit_count"], "10")
+            self.assertEqual(
+                rows[0]["top_sentences"],
+                "We deploy GPUs. | AI is transformative.",
+            )
+            self.assertEqual(rows[0]["confidence_label"], "hopeful")
+            self.assertEqual(rows[0]["hedge_score"], "4")

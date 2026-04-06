@@ -25,15 +25,11 @@ Use transcript evidence only.
 model = "gpt-4o-mini"
 api_key_env = "OPENAI_API_KEY"
 
-[[output.groups]]
-key = "tech_talent"
-title = "Tech Human Capital"
-description = "Software engineers and related roles."
-
-[[output.groups.fields]]
-name = "tech_talent_binary"
-type = "integer"
-description = "1 if the firm mentions non-AI tech talent investment, 0 otherwise"
+[output]
+format = [
+    { name = "ai_mentioned", description = "Whether at least one core AI keyword appears" },
+    { name = "keyword_hit_count", description = "Total count of AI keyword matches" },
+]
 '''.strip(),
         encoding="utf-8",
     )
@@ -77,16 +73,17 @@ class GuiTests(unittest.TestCase):
             self.assertEqual(values["verbosity"], "")
             self.assertEqual(values["input"], "")
 
-    def test_build_output_format_preview_renders_groups_and_fields(self) -> None:
+    def test_build_output_format_preview_renders_flat_fields(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workdir = Path(temp_dir)
             config = load_config(_write_config(workdir))
 
             preview = build_output_format_preview(config)
 
-            self.assertIn("Group: tech_talent", preview)
-            self.assertIn("Title: Tech Human Capital", preview)
-            self.assertIn("- tech_talent_binary [integer]", preview)
+            self.assertIn(
+                "- ai_mentioned: Whether at least one core AI keyword appears", preview
+            )
+            self.assertIn("Whether at least one core AI keyword appears", preview)
 
     def test_build_review_summary_includes_estimated_cost_without_button_step(
         self,

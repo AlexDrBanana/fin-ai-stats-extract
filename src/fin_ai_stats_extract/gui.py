@@ -48,14 +48,8 @@ class GuiRunResult:
 
 def build_output_format_preview(config: ExtractConfig) -> str:
     lines: list[str] = []
-    for group in config.output.groups:
-        lines.append(f"Group: {group.key}")
-        lines.append(f"Title: {group.title}")
-        lines.append(f"Description: {group.description}")
-        for field in group.fields:
-            field_type = field.type if not field.nullable else f"{field.type} | null"
-            lines.append(f"- {field.name} [{field_type}]: {field.description}")
-        lines.append("")
+    for field in config.output.format:
+        lines.append(f"- {field.name}: {field.description}")
     return "\n".join(lines).strip()
 
 

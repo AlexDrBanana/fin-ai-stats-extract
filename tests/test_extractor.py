@@ -18,31 +18,12 @@ Use transcript evidence only.
 """
 model = "gpt-4o-mini"
 
-[[output.groups]]
-key = "ai_infrastructure"
-title = "AI Infrastructure"
-description = "Data centers, chips, hardware, cloud compute, etc."
-
-[[output.groups.fields]]
-name = "ai_infra_binary"
-type = "integer"
-description = "1 if the firm mentions AI infrastructure investment, 0 otherwise"
-
-[[output.groups.fields]]
-name = "ai_infra_types"
-type = "string_array"
-description = "List of unique AI infrastructure types mentioned"
-
-[[output.groups.fields]]
-name = "ai_infra_count"
-type = "integer"
-description = "Count of unique AI infrastructure types mentioned"
-
-[[output.groups.fields]]
-name = "ai_infra_dollar"
-type = "number"
-nullable = true
-description = "Dollar value invested in AI infrastructure, or null if not disclosed"
+[output]
+format = [
+    { name = "ai_mentioned", description = "Whether at least one core AI keyword appears" },
+    { name = "keyword_hit_count", description = "Total count of AI keyword matches" },
+    { name = "top_sentences", description = "Up to 3 most AI-keyword-dense sentences joined by pipe, or null" },
+]
 '''.strip(),
         encoding="utf-8",
     )
@@ -98,12 +79,9 @@ class ExtractionModelSettingsTests(unittest.TestCase):
             response_model = build_extraction_model(config)
             parsed = response_model.model_validate(
                 {
-                    "ai_infrastructure": {
-                        "ai_infra_binary": 1,
-                        "ai_infra_types": ["GPU clusters"],
-                        "ai_infra_count": 1,
-                        "ai_infra_dollar": None,
-                    }
+                    "ai_mentioned": "yes",
+                    "keyword_hit_count": "5",
+                    "top_sentences": "We invested in GPUs.",
                 }
             )
             client = _FakeClient(parsed)
@@ -119,5 +97,5 @@ class ExtractionModelSettingsTests(unittest.TestCase):
                 )
             )
 
-            self.assertEqual(result.ai_infrastructure.ai_infra_binary, 1)
+            self.assertEqual(result.ai_mentioned, "yes")
             self.assertIs(client.responses.last_text_format, response_model)
