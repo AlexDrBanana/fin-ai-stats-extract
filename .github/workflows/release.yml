@@ -1,6 +1,7 @@
 name: Release
 
 on:
+    workflow_dispatch: # Allows manual triggering
     push:
         tags:
             - "v*"
