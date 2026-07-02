@@ -12,7 +12,7 @@ The tool implements a five-stage methodology via LLM extraction:
 4. **Initiator Attribution** — who raised AI first (management, analyst, both, unclear)
 5. **Confidence Classification** — hopeful / confident / transformational / authoritative
 
-The tool is driven by a single TOML config file, `extract.toml`, which defines:
+The tool is driven by a single TOML config file, `config.toml`, which defines:
 
 - the base extraction instructions sent to the model
 - model and endpoint settings
@@ -47,16 +47,16 @@ uvx fin-ai-stats-extract
 
 ## Configuration
 
-The default config file is `./extract.toml`.
+The default config file is `./config.toml`.
 
-If you run the tool without `--config` and `extract.toml` does not exist in the current working directory, the packaged default config is copied there automatically.
+If you run the tool without `--config` and `config.toml` does not exist in the current working directory, the packaged default config is copied there automatically.
 
 The default config includes:
 
 - commented-out optional settings such as `temperature`, `top_p`, and `reasoning_effort`
 - the full methodology for AI mention detection, attitude classification, initiator attribution, and confidence classification
 
-Edit `extract.toml` directly to change AI instructions, AI model settings, or output fields.
+Edit `config.toml` directly to change AI instructions, AI model settings, or output fields.
 
 The output contract now uses a flat ordered list:
 
@@ -84,11 +84,11 @@ Example values:
 OPENAI_API_KEY=sk-your-key-here
 ```
 
-By default, `extract.toml` reads the API key from `OPENAI_API_KEY` via `api_key_env = "OPENAI_API_KEY"`.
+By default, `config.toml` reads the API key from `OPENAI_API_KEY` via `api_key_env = "OPENAI_API_KEY"`.
 
 ## Basic Usage
 
-Run using the defaults in `extract.toml`:
+Run using the defaults in `config.toml`:
 
 ```bash
 uv run fin-ai-stats-extract --input ./data/Current
@@ -144,22 +144,50 @@ uv run fin-ai-stats-extract --resume
 Use a different config file:
 
 ```bash
-uv run fin-ai-stats-extract --config ./custom_extract.toml
+uv run fin-ai-stats-extract --config ./custom_config.toml
 ```
 
-Open the Tkinter review window instead of supplying all settings on the command line:
+Open the config editor window instead of supplying every setting on the command line:
 
 ```bash
 uv run fin-ai-stats-extract --gui
 ```
 
-The GUI lets you edit the prompt instructions, model settings, input/output paths, runtime options, see the TOML-driven output format in a dedicated tab, and review the exact run cost automatically before confirming or cancelling.
+The GUI is a [pywebview](https://pywebview.flowrl.com/) window whose UI is built
+with React, TypeScript, shadcn/ui, and Tailwind. Its job is to **edit the TOML
+config file live**: as you change the instructions, model settings, or output
+format, each edit is written straight back to the config file (comments and
+formatting are preserved). Runtime-only options (input/output paths, sample size,
+concurrency, dry-run/resume/verbose, and a one-off API key) are collected in the
+**Run** tab and are *not* written to the config file. Pressing **Run** closes the
+window and executes the pipeline in your terminal, so the progress bar and any
+interactive prompts behave exactly as a normal run.
+
+Because the GUI edits the file in place, you can point it at any config to tweak
+it:
+
+```bash
+uv run fin-ai-stats-extract --config ./custom_config.toml --gui
+```
+
+### GUI edits vs. CLI overrides
+
+CLI override flags are applied **after** the GUI closes, so they always win for
+the run without being saved to the file. For example:
+
+```bash
+uv run fin-ai-stats-extract --gui --temperature 0.1
+```
+
+If you change the temperature to `1` in the GUI, the config file is updated to
+`1`, but the run still uses `0.1` (the CLI value). The precedence is: **load
+TOML → apply GUI edits to the TOML file → apply CLI overrides on top at runtime.**
 
 ## Local OpenAI-Compatible Endpoints
 
 You can point the tool at a local or self-hosted OpenAI-compatible server with either:
 
-- `base_url` in `extract.toml`
+- `base_url` in `config.toml`
 - `--base-url` for a one-off override
 
 Example with LM Studio:
@@ -180,8 +208,8 @@ If `base_url` is set and no API key is available, the tool uses `lm-studio` as a
 
 ## Command-Line Arguments
 
-- `--config`: Path to a TOML config file. Defaults to `./extract.toml`.
-- `--gui`: Open a Tkinter settings window for editing values and confirming the run.
+- `--config`: Path to a TOML config file. Defaults to `./config.toml`.
+- `--gui`: Open the config-editor window to edit the TOML file live and launch the run. Edits are saved to the config file; CLI override flags still win at runtime without being persisted.
 - `--input`: Required unless `--gui` is used. Path to one XML file or a folder tree containing XML files.
 - `--output`: Output CSV path. Defaults to `output.csv`.
 - `--model`: Override the configured model.
@@ -203,7 +231,7 @@ The most common researcher-facing controls remain `temperature`, `top_p`, `max_o
 
 ## Output Schema
 
-The `[output]` section of `extract.toml` is the extraction contract.
+The `[output]` section of `config.toml` is the extraction contract.
 
 Each item in `format` defines:
 
@@ -230,7 +258,7 @@ The CSV always begins with transcript metadata:
 - `headline`
 - `source_file`
 
-Configured extraction fields follow in the order defined in `extract.toml`.
+Configured extraction fields follow in the order defined in `config.toml`.
 
 List-valued fields are serialized using a semicolon-space separator.
 
@@ -250,3 +278,32 @@ If you use a local endpoint and see parsing or validation failures, try:
 - a model with a larger context window
 - smaller inputs using `--sample` or a single file first
 - an OpenAI-hosted model for the most reliable structured-output behavior
+
+## Developing the GUI
+
+The GUI front-end lives in `frontend/` (Vite + React + TypeScript + Tailwind +
+shadcn/ui). The built assets are committed to
+`src/fin_ai_stats_extract/resources/webui/` and ship inside the wheel, so end
+users never need Node installed to run `--gui`.
+
+Rebuild the UI after changing anything under `frontend/src`:
+
+```bash
+cd frontend
+pnpm install
+pnpm build   # outputs to ../src/fin_ai_stats_extract/resources/webui
+```
+
+For a fast edit/refresh loop, run the Vite dev server and point the GUI at it:
+
+```bash
+# terminal 1
+cd frontend && pnpm dev
+
+# terminal 2
+FIN_AI_GUI_DEV_URL=http://localhost:5173 uv run fin-ai-stats-extract --gui
+```
+
+When `FIN_AI_GUI_DEV_URL` is unset, the GUI loads the built assets from
+`resources/webui`. Remember to run `pnpm build` and commit the updated assets
+before publishing.

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-DEFAULT_CONFIG_FILENAME = "extract.toml"
+DEFAULT_CONFIG_FILENAME = "config.toml"
 
 
 class OutputFieldConfig(BaseModel):
@@ -91,5 +91,4 @@ def load_config(
         resolved_path = config_path
     with resolved_path.open("rb") as handle:
         raw_config = tomllib.load(handle)
-    return ExtractConfig.model_validate(raw_config)
     return ExtractConfig.model_validate(raw_config)

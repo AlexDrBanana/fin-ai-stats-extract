@@ -118,7 +118,7 @@ async def extract_one(
                 logger.exception(
                     "Failed after %d retries for event %s", _MAX_RETRIES, event_id
                 )
-                return None
+                raise
             delay = _RETRY_BASE_DELAY * (2 ** (attempt - 1))
             logger.warning(
                 "Error for event %s (attempt %d), retrying in %.1fs",

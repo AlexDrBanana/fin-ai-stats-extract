@@ -1,8 +1,8 @@
 **AI Mention Detection, Attitude Classification, Initiator Attribution, and Confidence Classification**
 
-Five stages applied to each earnings call transcript. Full methodology is encoded in the LLM instructions within `extract.toml`.
+Five stages applied to each earnings call transcript. Full methodology is encoded in the LLM instructions within `config.toml`.
 
-In `extract.toml`, these outputs are configured as a flat `[output].format` list. Each field has a name and a freeform description that is passed directly into the LLM instructions.
+In `config.toml`, these outputs are configured as a flat `[output].format` list. Each field has a name and a freeform description that is passed directly into the LLM instructions.
 
 **Stage 1 — AI Mention Detection**
 

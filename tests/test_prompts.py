@@ -6,7 +6,7 @@ from fin_ai_stats_extract.prompts import load_system_prompt
 
 
 def _write_config(workdir: Path) -> Path:
-    config_path = workdir / "extract.toml"
+    config_path = workdir / "config.toml"
     config_path.write_text(
         '''
 [llm]
@@ -42,7 +42,7 @@ class PromptLoadingTests(unittest.TestCase):
             self.assertIn("Whether at least one core AI keyword appears", prompt_text)
             self.assertNotIn("system_prompt.md", prompt_text)
 
-    def test_workdir_extract_toml_is_used_by_default(self) -> None:
+    def test_workdir_config_toml_is_used_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workdir = Path(temp_dir)
             _write_config(workdir)
@@ -52,12 +52,12 @@ class PromptLoadingTests(unittest.TestCase):
             self.assertIn("## Output Contract", prompt_text)
             self.assertIn("ai_mentioned", prompt_text)
 
-    def test_missing_workdir_extract_toml_is_copied_from_package_default(self) -> None:
+    def test_missing_workdir_config_toml_is_copied_from_package_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workdir = Path(temp_dir)
 
             prompt_text = load_system_prompt(working_directory=workdir)
 
-            self.assertTrue((workdir / "extract.toml").exists())
+            self.assertTrue((workdir / "config.toml").exists())
             self.assertIn("## Output Contract", prompt_text)
             self.assertIn("ai_mentioned", prompt_text)

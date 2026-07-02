@@ -4,10 +4,16 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Callable
 
 from dotenv import load_dotenv
 
-from fin_ai_stats_extract.config import ExtractConfig, load_config
+from fin_ai_stats_extract.config import (
+    DEFAULT_CONFIG_FILENAME,
+    ExtractConfig,
+    load_config,
+    load_packaged_config_text,
+)
 from fin_ai_stats_extract.extractor import ExtractionModelSettings
 from fin_ai_stats_extract.gui import launch_gui
 from fin_ai_stats_extract.pipeline import run_pipeline
@@ -49,14 +55,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help=(
-            "Path to the TOML config file. Defaults to ./extract.toml in the "
+            "Path to the TOML config file. Defaults to ./config.toml in the "
             "current working directory."
         ),
     )
     parser.add_argument(
         "--gui",
         action="store_true",
-        help="Open a Tkinter window to review settings and confirm the run.",
+        help="Open a window to edit the TOML config live and launch the run.",
     )
     parser.add_argument(
         "--input",
@@ -135,11 +141,21 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Resume from an existing output CSV by skipping already processed source files.",
     )
+    def _sample_type(value: str) -> float | int:
+        v = float(value)
+        if v <= 0:
+            raise argparse.ArgumentTypeError("--sample must be positive")
+        return v
+
     parser.add_argument(
         "--sample",
-        type=int,
+        type=_sample_type,
         default=None,
-        help="Process only N randomly sampled files.",
+        help=(
+            "Limit processing to a random sample. "
+            "Values in (0, 1) are treated as a fraction of total files; "
+            "values >= 1 are treated as an absolute count."
+        ),
     )
     parser.add_argument(
         "--verbose",
@@ -235,6 +251,50 @@ def apply_cli_overrides(
     return resolved, warnings
 
 
+def _prompt_yes_no(question: str, *, default_yes: bool = True) -> bool:
+    """Ask a yes/no question on the terminal, defaulting when the reply is blank."""
+    suffix = "[Y/n]" if default_yes else "[y/N]"
+    try:
+        answer = input(f"{question} {suffix}: ").strip().lower()
+    except EOFError:
+        return default_yes
+    if not answer:
+        return default_yes
+    return answer in ("y", "yes")
+
+
+def resolve_missing_config(
+    working_directory: Path,
+    confirm: Callable[..., bool] = _prompt_yes_no,
+) -> Path | None:
+    """Resolve which config file to use when no ``--config`` was supplied.
+
+    When a ``config.toml`` already exists in ``working_directory`` the user is
+    asked to confirm using it. Otherwise they are offered the chance to create
+    one from the packaged defaults. Returns the path to use, or ``None`` when the
+    user declines.
+    """
+    config_path = working_directory / DEFAULT_CONFIG_FILENAME
+    if config_path.exists():
+        print(
+            f"A config file is required. A {DEFAULT_CONFIG_FILENAME} file was "
+            f"detected in {working_directory}."
+        )
+        if confirm(f"Do you want to use {config_path}?"):
+            return config_path
+        return None
+
+    print(
+        f"A TOML config file is required, but no {DEFAULT_CONFIG_FILENAME} was "
+        f"found in {working_directory}."
+    )
+    if confirm("Set up a config file using default settings?"):
+        config_path.write_text(load_packaged_config_text(), encoding="utf-8")
+        print(f"Created {config_path} from the packaged defaults.")
+        return config_path
+    return None
+
+
 def main() -> None:
     load_dotenv()
 
@@ -244,27 +304,33 @@ def main() -> None:
     if not args.gui and args.input is None:
         parser.error("the following arguments are required: --input")
 
-    try:
-        if args.config is not None:
-            config = load_config(config_path=args.config)
-        else:
-            config = load_config(working_directory=Path.cwd())
-    except FileNotFoundError:
-        logging.basicConfig(level=logging.ERROR, format="%(message)s")
-        logging.error("Config file does not exist: %s", args.config)
-        sys.exit(1)
+    # Resolve the config file path. An explicit --config must exist; otherwise
+    # prompt the user to use an existing config.toml or create one from defaults.
+    if args.config is not None:
+        config_path = args.config
+        if not config_path.exists():
+            logging.basicConfig(level=logging.ERROR, format="%(message)s")
+            logging.error("Config file does not exist: %s", args.config)
+            sys.exit(1)
+    else:
+        config_path = resolve_missing_config(Path.cwd())
+        if config_path is None:
+            logging.basicConfig(level=logging.ERROR, format="%(message)s")
+            logging.error("A config file is required to continue.")
+            sys.exit(1)
 
-    resolved_config, warnings = apply_cli_overrides(config, args)
-
+    # The GUI edits the TOML file in place. It runs BEFORE the CLI overrides are
+    # applied, so exposed flags such as --temperature still win over (and are
+    # never persisted into) the values the user changed in the GUI.
     prepared_run = None
     if args.gui:
-        gui_result = launch_gui(resolved_config, args)
+        gui_result = launch_gui(config_path, args)
         if gui_result is None:
             return
-        resolved_config = gui_result.config
         args.input = gui_result.input_path
         args.output = gui_result.output_path
-        args.api_key = gui_result.api_key
+        if args.api_key is None:
+            args.api_key = gui_result.api_key
         args.max_concurrency = gui_result.max_concurrency
         args.sample = gui_result.sample
         args.dry_run = gui_result.dry_run
@@ -272,6 +338,10 @@ def main() -> None:
         args.verbose = gui_result.verbose
         args.skip_confirm = True
         prepared_run = gui_result.prepared_run
+
+    # Load the (possibly GUI-modified) config, then let CLI flags override it.
+    config = load_config(config_path=config_path)
+    resolved_config, warnings = apply_cli_overrides(config, args)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,

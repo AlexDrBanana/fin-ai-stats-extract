@@ -11,7 +11,7 @@ wheels/
 
 # Prompt file created automatically by the CLI when missing (root only)
 /system_prompt.md
-/extract.toml
+/config.toml
 
 data/
 # General
@@ -40,3 +40,5 @@ Icon[
 Network Trash Folder
 Temporary Items
 .apdisk
+
+deepseek/

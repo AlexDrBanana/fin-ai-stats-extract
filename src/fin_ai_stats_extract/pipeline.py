@@ -50,7 +50,7 @@ def prepare_run(
     input_path: Path,
     output_path: Path,
     dry_run: bool = False,
-    sample: int | None = None,
+    sample: float | int | None = None,
     resume: bool = False,
 ) -> PreparedRun:
     xml_files = discover_xml_files(input_path)
@@ -73,9 +73,15 @@ def prepare_run(
                 build_source_file_label(input_path, file_path),
             )
             parsed.append((file_path, meta, body))
-        except Exception:
+        except Exception as exc:
             parse_errors += 1
             logger.exception("Failed to parse %s", file_path.name)
+            print(f"Error: {type(exc).__name__}: {exc}")
+            answer = input(
+                f"Error encountered when processing file: {file_path.name}, continue? [y/n] (default: y): "
+            ).strip().lower()
+            if answer == "n":
+                raise SystemExit(1)
 
     overwrite_output = False
     resume_skipped = 0
@@ -106,9 +112,12 @@ def prepare_run(
         overwrite_output = True
 
     applied_sample: int | None = None
-    if sample is not None and sample < len(parsed):
-        parsed = random.sample(parsed, sample)
-        applied_sample = sample
+    if sample is not None:
+        n = int(len(parsed) * sample) if 0 < sample < 1 else int(sample)
+        n = min(n, len(parsed))
+        if n < len(parsed):
+            parsed = random.sample(parsed, n)
+            applied_sample = n
 
     return PreparedRun(
         parsed=parsed,
@@ -221,7 +230,7 @@ async def run_pipeline(
         idx: int,
         meta: TranscriptMetadata,
         body: str,
-    ) -> tuple[TranscriptMetadata, BaseModel | None]:
+    ) -> tuple[TranscriptMetadata, BaseModel | None, BaseException | None]:
         async with semaphore:
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
@@ -232,16 +241,19 @@ async def run_pipeline(
                     meta.company_name,
                 )
 
-            extraction = await extract_one(
-                client,
-                model,
-                body,
-                meta.event_id,
-                response_model=response_model,
-                system_prompt=system_prompt,
-                model_settings=model_settings,
-            )
-            return meta, extraction
+            try:
+                extraction = await extract_one(
+                    client,
+                    model,
+                    body,
+                    meta.event_id,
+                    response_model=response_model,
+                    system_prompt=system_prompt,
+                    model_settings=model_settings,
+                )
+                return meta, extraction, None
+            except Exception as exc:
+                return meta, None, exc
 
     tasks = [
         asyncio.create_task(process_one(i, meta, body))
@@ -250,7 +262,7 @@ async def run_pipeline(
 
     with tqdm(total=total, desc="Processing", unit="file") as progress_bar:
         for task in asyncio.as_completed(tasks):
-            meta, extraction = await task
+            meta, extraction, exc = await task
 
             if extraction is not None:
                 async with write_lock:
@@ -258,6 +270,15 @@ async def run_pipeline(
                     results_written += 1
             else:
                 errors.append(meta.source_file)
+                if exc is not None:
+                    tqdm.write(f"Error: {type(exc).__name__}: {exc}")
+                    answer = input(
+                        f"Error encountered when processing file: {meta.source_file}, continue? [y/n] (default: y): "
+                    ).strip().lower()
+                    if answer == "n":
+                        for t in tasks:
+                            t.cancel()
+                        break
 
             progress_bar.update(1)
 

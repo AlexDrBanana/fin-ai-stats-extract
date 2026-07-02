@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def _write_config(workdir: Path) -> Path:
-    config_path = workdir / "extract.toml"
+    config_path = workdir / "config.toml"
     config_path.write_text(
         '''
 [llm]
