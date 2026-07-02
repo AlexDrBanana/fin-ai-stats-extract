@@ -282,9 +282,15 @@ If you use a local endpoint and see parsing or validation failures, try:
 ## Developing the GUI
 
 The GUI front-end lives in `frontend/` (Vite + React + TypeScript + Tailwind +
-shadcn/ui). The built assets are committed to
-`src/fin_ai_stats_extract/resources/webui/` and ship inside the wheel, so end
+shadcn/ui). Building it emits static assets into
+`src/fin_ai_stats_extract/resources/webui/`, which ship inside the wheel so end
 users never need Node installed to run `--gui`.
+
+These built assets are **generated artifacts** and are git-ignored, not
+committed. The release workflow (`.github/workflows/release.yml`) runs
+`pnpm build` before `uv build`, so published wheels always include an
+up-to-date UI. If you build or install from a source checkout yourself, run
+`pnpm build` first — otherwise `--gui` will report that the assets are missing.
 
 Rebuild the UI after changing anything under `frontend/src`:
 
@@ -305,5 +311,5 @@ FIN_AI_GUI_DEV_URL=http://localhost:5173 uv run fin-ai-stats-extract --gui
 ```
 
 When `FIN_AI_GUI_DEV_URL` is unset, the GUI loads the built assets from
-`resources/webui`. Remember to run `pnpm build` and commit the updated assets
-before publishing.
+`resources/webui`. Run `pnpm build` before packaging locally; on release, CI
+builds them for you.

@@ -6,6 +6,9 @@ dist/
 wheels/
 *.egg-info
 
+# Generated frontend assets (built by `pnpm build`, packaged into the wheel in CI)
+/src/fin_ai_stats_extract/resources/webui/
+
 # Virtual environments
 .venv
 
