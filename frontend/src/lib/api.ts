@@ -71,15 +71,34 @@ declare global {
 }
 
 export function waitForApi(): Promise<PyApi> {
+  // pywebview injects `window.pywebview.api` in two steps: first an empty
+  // `api: {}` object, then (after introspecting the Python methods) it populates
+  // the functions and fires `pywebviewready`. Checking truthiness of
+  // `window.pywebview.api` is therefore not enough — during the gap it is an
+  // empty object, and resolving with it yields `get_state === undefined` and a
+  // permanently stuck "Loading configuration..." screen. Wait for a known method
+  // to actually exist, and poll as a safety net in case the readiness event
+  // fires before this listener attaches (or during the populate window).
   return new Promise((resolve) => {
-    if (window.pywebview?.api) {
-      resolve(window.pywebview.api)
+    const isReady = () => typeof window.pywebview?.api?.get_state === "function"
+
+    let settled = false
+    let poll: number | undefined
+
+    const finish = () => {
+      if (settled || !isReady()) return
+      settled = true
+      window.removeEventListener("pywebviewready", finish)
+      if (poll !== undefined) window.clearInterval(poll)
+      resolve(window.pywebview!.api)
+    }
+
+    if (isReady()) {
+      resolve(window.pywebview!.api)
       return
     }
-    window.addEventListener(
-      "pywebviewready",
-      () => resolve(window.pywebview!.api),
-      { once: true },
-    )
+
+    window.addEventListener("pywebviewready", finish)
+    poll = window.setInterval(finish, 50)
   })
 }
